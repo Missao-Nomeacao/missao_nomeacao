@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>Login - Missão Nomeação 00</title>
+    <title>Login - Missão Nomeação</title>
     @include('components.analytics')
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -73,7 +73,7 @@
                 <div>
                     <button type="submit"
                         class="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-yellow-600 hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500">
-                        Entrar 123
+                        Entrar
                     </button>
                 </div>
             </form>
