@@ -6,6 +6,7 @@
     $planoEncerrado = $linha->ficha->acao === AcaoAcompanhamento::RestabelecerContato;
     $linkWhatsapp = $linha->aluno->linkWhatsappWeb() ?? '';
     $dataProximo = optional($linha->aluno->proximo_contato_em)->toDateString();
+    $hojeData = now()->toDateString();
     $estilo = match ($linha->ficha->acao) {
         AcaoAcompanhamento::Intervir => 'bg-red-100 text-red-800',
         AcaoAcompanhamento::MarcarPresenca => 'bg-primary/10 text-primary',
@@ -165,6 +166,10 @@
         <form id="form-registrar-contato" method="POST" action="{{ route('admin.dashboard.contatos.store', $linha->aluno) }}?{{ http_build_query($consulta->parametros(['aluno' => $linha->aluno->id, 'page' => null])) }}" class="space-y-3">
             @csrf
             <input type="hidden" name="itens_abordados" value="">
+            <label class="block">
+                <span class="text-sm font-semibold text-gray-700">Data do contato <span class="text-red-800" aria-hidden="true">*</span></span>
+                <input type="date" name="ocorrido_em" required max="{{ $hojeData }}" value="{{ old('ocorrido_em', $hojeData) }}" class="mt-2 w-full rounded border border-gray-300 p-3 text-sm text-gray-800 focus:border-primary focus:ring-primary">
+            </label>
             <label class="block">
                 <span class="text-sm font-semibold text-gray-700">Observação do contato <span class="text-red-800" aria-hidden="true">*</span></span>
                 <textarea name="observacao" rows="3" required class="mt-2 w-full rounded border border-gray-300 p-3 text-sm text-gray-800 focus:border-primary focus:ring-primary" placeholder="O que foi combinado neste contato?">{{ old('observacao') }}</textarea>
