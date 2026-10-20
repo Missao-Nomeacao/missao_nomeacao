@@ -365,9 +365,48 @@ class DashboardAcompanhamentoTest extends TestCase
             ->assertOk()
             ->assertSee('O que deve ser destacado neste acompanhamento?')
             ->assertSee('Todos os itens do acompanhamento foram abordados?')
+            ->assertSee('Data do contato')
+            ->assertSee('name="ocorrido_em"', false)
+            ->assertSee('max="2026-09-22"', false)
+            ->assertSee('value="2026-09-22"', false)
             ->assertSee('name="observacao" rows="3" required', false)
             ->assertSee('Sim, todos foram abordados')
             ->assertSee('Não, ainda não');
+    }
+
+    public function test_registrar_contato_aceita_data_personalizada(): void
+    {
+        $user = User::factory()->create();
+        $aluno = $this->aluno([
+            'nome' => 'Carla Data',
+            'proximo_contato_em' => '2026-09-18',
+        ]);
+        $ficha = route('admin.dashboard', ['aluno' => $aluno->id]);
+
+        $this->actingAs($user)
+            ->from($ficha)
+            ->post(route('admin.dashboard.contatos.store', $aluno), [
+                'observacao' => 'Contato feito na sexta.',
+                'itens_abordados' => '1',
+                'ocorrido_em' => '2026-09-25',
+            ])
+            ->assertRedirect($ficha)
+            ->assertSessionHasErrors('ocorrido_em');
+
+        $this->assertSame(0, ContatoAluno::query()->count());
+
+        $this->actingAs($user)
+            ->post(route('admin.dashboard.contatos.store', $aluno), [
+                'observacao' => 'Contato feito na sexta.',
+                'itens_abordados' => '1',
+                'ocorrido_em' => '2026-09-18',
+            ])
+            ->assertRedirect(route('admin.dashboard.contatos.agendar', $aluno));
+
+        $aluno->refresh();
+        $this->assertSame('2026-09-18', $aluno->ultimo_contato_em?->toDateString());
+        $this->assertNull($aluno->proximo_contato_em);
+        $this->assertSame('2026-09-18', ContatoAluno::query()->first()?->ocorrido_em?->toDateString());
     }
 
     public function test_contato_deixa_acao_ok_ate_agendamento_vencido_ou_relatorio_novo(): void

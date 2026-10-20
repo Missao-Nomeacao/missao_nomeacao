@@ -78,9 +78,12 @@ class DashboardController extends Controller
         $dados = $request->validate([
             'observacao' => ['required', 'string', 'max:2000'],
             'itens_abordados' => ['accepted'],
+            'ocorrido_em' => ['nullable', 'date', 'before_or_equal:today'],
         ], [
             'observacao.required' => 'Informe a observação do contato.',
             'itens_abordados.accepted' => 'Confirme que todos os itens do acompanhamento foram abordados.',
+            'ocorrido_em.date' => 'Informe uma data válida para o contato.',
+            'ocorrido_em.before_or_equal' => 'A data do contato precisa ser hoje ou uma data anterior.',
         ]);
 
         $observacao = trim($dados['observacao']);
@@ -91,9 +94,12 @@ class DashboardController extends Controller
         }
 
         $agora = now();
-        $aluno->ultimo_contato_em = $agora;
+        $ocorrido = filled($dados['ocorrido_em'] ?? null)
+            ? Carbon::parse($dados['ocorrido_em'], $agora->timezone)->setTimeFrom($agora)
+            : $agora;
+        $aluno->ultimo_contato_em = $ocorrido;
         $aluno->ultima_observacao = $observacao;
-        if ($aluno->proximo_contato_em !== null && $aluno->proximo_contato_em->toDateString() <= $agora->toDateString()) {
+        if ($aluno->proximo_contato_em !== null && $aluno->proximo_contato_em->toDateString() <= $ocorrido->toDateString()) {
             $aluno->proximo_contato_em = null;
         }
 
@@ -104,7 +110,7 @@ class DashboardController extends Controller
         $aluno->contatos()->create([
             'user_id' => $request->user()?->id,
             'observacao' => $observacao,
-            'ocorrido_em' => $agora,
+            'ocorrido_em' => $ocorrido,
         ]);
 
         return redirect()
