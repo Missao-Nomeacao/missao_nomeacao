@@ -293,7 +293,7 @@ class RelatoriosMentorTest extends TestCase
         $this->assertStringContainsString('@page{margin:34mm 16mm 18mm 16mm;}', $css);
         $this->assertStringContainsString('background:#ffffff', $css);
         $this->assertStringNotContainsString('#F5F5F5', $css);
-        $this->assertStringContainsString('border-radius:9px', $css);
+        $this->assertStringContainsString('border-radius:10px', $css);
         $this->assertDoesNotMatchRegularExpression('/body\{[^}]*border-radius/', $css);
     }
 

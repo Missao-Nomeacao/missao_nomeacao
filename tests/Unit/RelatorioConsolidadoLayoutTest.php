@@ -180,7 +180,7 @@ class RelatorioConsolidadoLayoutTest extends TestCase
         $this->assertStringContainsString('<td class="num mn-horas">01:12:40</td>', $historico);
 
         $css = RelatorioConsolidadoLayout::css("'Inter'", '');
-        $this->assertStringContainsString('.mn-table th{background:#001D3D; color:#ffffff; font-weight:600; font-size:9pt; letter-spacing:0.03em; text-transform:uppercase; padding:9px 11px; text-align:left; vertical-align:middle; white-space:normal;}', $css);
+        $this->assertStringContainsString('.mn-table th{background:#EAF0F7; color:#001D3D; font-weight:700; font-size:7.5pt; letter-spacing:0.06em; text-transform:uppercase; padding:9px 11px; text-align:left; vertical-align:middle; white-space:normal;}', $css);
         $this->assertDoesNotMatchRegularExpression('/\.mn-table th\{[^}]*text-align:center/', $css);
         $this->assertDoesNotMatchRegularExpression('/\.mn-table tbody td\{[^}]*padding-top:\d{2}/', $css);
     }
@@ -189,27 +189,30 @@ class RelatorioConsolidadoLayoutTest extends TestCase
     {
         $css = RelatorioConsolidadoLayout::css("'Inter'", '');
         $this->assertStringContainsString('@page{margin:34mm 16mm 18mm 16mm;}', $css);
-        $this->assertStringContainsString('.mn-sec{margin:0 0 28px;}', $css);
-        $this->assertStringContainsString('.mn-sec-intro{font-size:10.5pt; font-weight:400; color:#4B5563; margin:7px 0 0;', $css);
+        $this->assertStringContainsString('.mn-sec{margin:0 0 30px;}', $css);
+        $this->assertStringContainsString('.mn-sec-intro{font-size:10.5pt; font-weight:400; color:#4B5563; margin:8px 0 0;', $css);
+        $this->assertStringContainsString('.mn-sec-rule{width:34px; height:3px; background:#BF8F00;', $css);
         $this->assertStringContainsString('.mn-sec-body{margin-top:14px;}', $css);
-        $this->assertStringContainsString('border-spacing:14px 0', $css);
-        $this->assertStringContainsString('.mn-kpis td.kpi{background:#ffffff; border:1.5pt solid #BF8F00; border-radius:9px; padding:18px 18px;', $css);
-        $this->assertStringContainsString('.mn-chart{margin:8px 0 16px;', $css);
-        $this->assertStringContainsString('.mn-table{width:100%; max-width:100%; border-collapse:collapse; font-size:9pt; table-layout:fixed; margin:0; border:1.25pt solid #001D3D;}', $css);
+        $this->assertStringContainsString('border-spacing:10px 0', $css);
+        $this->assertStringContainsString('.mn-kpis td.kpi{background:#ffffff; border:1pt solid #E6E8EC; border-radius:10px; padding:14px 16px;', $css);
+        $this->assertStringContainsString('.mn-kpis td.kpi.kpi-hero{background:#001D3D; border-color:#001D3D;}', $css);
+        $this->assertStringContainsString('.mn-kpis td.kpi-hero .kpi-value{color:#F2B705;}', $css);
+        $this->assertStringContainsString('.mn-chart{margin:0 0 14px; padding:14px 16px 12px; border:1pt solid #E6E8EC; border-radius:10px;', $css);
+        $this->assertStringContainsString('.mn-table{width:100%; max-width:100%; border-collapse:separate; border-spacing:0; font-size:9pt; table-layout:fixed; margin:0; border:1pt solid #E6E8EC; border-radius:10px;}', $css);
         $this->assertStringContainsString('padding:9px 11px', $css);
         $this->assertStringContainsString('height:auto', $css);
         $this->assertStringContainsString('.mn-table tr{page-break-inside:avoid;', $css);
         $this->assertStringContainsString('.mn-table tbody tr:first-child,.mn-table tbody tr:nth-child(2){page-break-before:avoid;}', $css);
         $this->assertStringContainsString('white-space:nowrap', $css);
         $this->assertStringContainsString('.mn-table td.mn-horas{white-space:nowrap;}', $css);
-        $this->assertStringContainsString('.mn-table th,.mn-table td{height:auto; border:1.25pt solid #001D3D;}', $css);
-        $this->assertStringContainsString('.mn-table td.mn-disc,.mn-table td.mn-mod,.mn-table td.mn-horas,.mn-table td.num,.mn-table td.mn-assunto{text-align:center; vertical-align:middle;}', $css);
-        $this->assertStringContainsString('.mn-table td.mn-pct{text-align:center;}', $css);
-        $this->assertStringContainsString('.mn-table th.mn-disc,.mn-table th.mn-assunto,.mn-table th.mn-mod,.mn-table th.mn-horas,.mn-table th.mn-qtd,.mn-table th.mn-pct{text-align:center; vertical-align:middle;}', $css);
+        $this->assertStringContainsString('.mn-table th,.mn-table td{height:auto; border:0; border-bottom:0.75pt solid #E6E8EC;}', $css);
+        $this->assertStringContainsString('.mn-table td.mn-horas,.mn-table td.num{text-align:right; font-weight:600; color:#001D3D;}', $css);
+        $this->assertStringContainsString('.mn-table td.mn-pct{text-align:right;}', $css);
+        $this->assertStringContainsString('.mn-table th.mn-horas,.mn-table th.mn-qtd,.mn-table th.mn-pct{text-align:right;}', $css);
         $this->assertStringContainsString('line-height:1.15', $css);
-        $this->assertStringContainsString('.kpi-label{font-size:9.5pt; font-weight:600;', $css);
+        $this->assertStringContainsString('.kpi-label{font-size:8pt; font-weight:600;', $css);
         $this->assertStringContainsString('.kpi-value{font-size:21pt; font-weight:700;', $css);
-        $this->assertStringContainsString('.kpi-long{font-size:11.5pt; font-weight:700; line-height:1.20;', $css);
+        $this->assertStringContainsString('.kpi-long{font-size:11.5pt; font-weight:700; line-height:1.25;', $css);
         $this->assertStringContainsString('.kpi-inner{width:100%; border-collapse:collapse;', $css);
         $this->assertStringContainsString('.kpi-row{display:table; width:100%; table-layout:fixed;', $css);
         $this->assertStringContainsString('.kpi-row .kpi-label,.kpi-row .kpi-value{display:table-cell; vertical-align:middle;}', $css);
@@ -219,14 +222,14 @@ class RelatorioConsolidadoLayoutTest extends TestCase
         $this->assertStringContainsString('.kpi-num .kpi-v-c{font-size:20pt;}', $css);
         $this->assertStringContainsString('.kpi-num .kpi-v-d{font-size:18pt;}', $css);
         $this->assertStringContainsString('.kpi-num .kpi-v-e{font-size:16pt;}', $css);
-        $this->assertStringContainsString('.kpi-compact .kpi-label{font-size:8pt;', $css);
-        $this->assertStringContainsString('.kpi-compact .kpi-v-a{font-size:20pt;}', $css);
-        $this->assertStringContainsString('.kpi-compact .kpi-v-b{font-size:18pt;}', $css);
+        $this->assertStringContainsString('.kpi-compact .kpi-label{font-size:7.5pt;', $css);
+        $this->assertStringContainsString('.kpi-compact .kpi-v-a{font-size:21pt;}', $css);
+        $this->assertStringContainsString('.kpi-compact .kpi-v-b{font-size:19pt;}', $css);
         $this->assertStringNotContainsString('.kpi-num .kpi-label{width:40%;', $css);
         $this->assertStringNotContainsString('.kpi-num .kpi-v-a{font-size:52pt;}', $css);
         $this->assertStringNotContainsString('.kpi-compact .kpi-value{font-size:18pt;}', $css);
         $this->assertStringContainsString('.kpi-text .kpi-label{margin:0 0 6px; line-height:1.20;}', $css);
-        $this->assertStringContainsString('.mn-table th{background:#001D3D; color:#ffffff; font-weight:600; font-size:9pt; letter-spacing:0.03em; text-transform:uppercase; padding:9px 11px; text-align:left; vertical-align:middle; white-space:normal;}', $css);
+        $this->assertStringContainsString('.mn-table th{background:#EAF0F7; color:#001D3D; font-weight:700; font-size:7.5pt; letter-spacing:0.06em; text-transform:uppercase; padding:9px 11px; text-align:left; vertical-align:middle; white-space:normal;}', $css);
         $this->assertStringNotContainsString('width:18%', $css);
         $this->assertStringNotContainsString('width:1%', $css);
         $this->assertStringNotContainsString('text-overflow:ellipsis', $css);
@@ -243,10 +246,31 @@ class RelatorioConsolidadoLayoutTest extends TestCase
         $this->assertStringContainsString('@page{margin:34mm 16mm 18mm 16mm;}', $css);
         $this->assertStringContainsString('background:#ffffff', $css);
         $this->assertStringNotContainsString('#F5F5F5', $css);
-        $this->assertStringContainsString('border-radius:9px', $css);
+        $this->assertStringContainsString('border-radius:10px', $css);
         $this->assertStringNotContainsString('Montserrat', $css);
         $this->assertStringNotContainsString('kpi-hot', $css);
         $this->assertDoesNotMatchRegularExpression('/html,body\{[^}]*margin:0/', $css);
+    }
+
+    public function test_primeiro_card_do_resumo_fica_em_destaque(): void
+    {
+        $itens = [
+            ['label' => 'Total de Horas', 'value' => '638:45'],
+            ['label' => 'Dias de estudo', 'value' => '234'],
+        ];
+
+        $comDestaque = RelatorioConsolidadoLayout::cards($itens, 4, true);
+        $this->assertSame(1, substr_count($comDestaque, 'kpi-hero'));
+        $this->assertLessThan(strpos($comDestaque, 'Dias de estudo'), strpos($comDestaque, 'kpi-hero'));
+
+        $semDestaque = RelatorioConsolidadoLayout::cards($itens);
+        $this->assertStringNotContainsString('kpi-hero', $semDestaque);
+    }
+
+    public function test_secao_tem_filete_dourado_abaixo_do_titulo(): void
+    {
+        $html = RelatorioConsolidadoLayout::secao('Ritmo de estudos', '', '<p>ok</p>');
+        $this->assertLessThan(strpos($html, 'mn-sec-rule'), strpos($html, 'mn-sec-title'));
     }
 
     public function test_cards_se_reorganizam_conforme_a_quantidade(): void
@@ -354,11 +378,11 @@ class RelatorioConsolidadoLayoutTest extends TestCase
         try {
             $bbox = (string) shell_exec(escapeshellcmd($pdftotext).' -bbox '.escapeshellarg($tmp).' -');
             $this->assertMatchesRegularExpression(
-                '/<word[^>]*yMin="([0-9.]+)"[^>]*>GIOVANNA<\/word>/',
+                '/<word[^>]*yMin="([0-9.]+)"[^>]*>MYCHEL<\/word>/',
                 $bbox
             );
             preg_match('/<word[^>]*yMin="([0-9.]+)"[^>]*>MISSÃO<\/word>/', $bbox, $cab);
-            preg_match('/<word[^>]*yMin="([0-9.]+)"[^>]*>GIOVANNA<\/word>/', $bbox, $nome);
+            preg_match('/<word[^>]*yMin="([0-9.]+)"[^>]*>MYCHEL<\/word>/', $bbox, $nome);
             $this->assertNotEmpty($cab);
             $this->assertNotEmpty($nome);
             $yCab = (float) $cab[1];
@@ -368,7 +392,7 @@ class RelatorioConsolidadoLayoutTest extends TestCase
             $this->assertGreaterThan($yCab + 50.0, $yNome);
 
             $texto = (string) shell_exec(escapeshellcmd($pdftotext).' '.escapeshellarg($tmp).' -');
-            $this->assertStringContainsString('AGOSTO - PERÍODO 1', $texto);
+            $this->assertStringContainsString('SETEMBRO - PERÍODO 2', $texto);
             $this->assertStringNotContainsString('•', $texto);
 
             $pares = [];

@@ -30,6 +30,8 @@ Ordem fixa do PDF final (capa + relatório + capa final). As páginas internas c
 
 Performance por assunto aparece só uma vez, na implementação do relatório de Questões. Identidade: azul `#001D3D`, dourado `#BF8F00`, Inter, cabeçalho `MISSÃO NOMEAÇÃO` / `MÊS - PERÍODO N`, rodapé `Página X de Y`. Sem marca d'água diagonal.
 
+Visual das páginas internas (`RelatorioConsolidadoLayout::css`): título de seção em azul com filete dourado curto embaixo; cards brancos com borda cinza-clara e cantos arredondados; o primeiro card de **Seu desempenho** fica em destaque (fundo azul, valor em dourado `#F2B705`); gráficos dentro de um painel com borda clara; tabelas com cabeçalho azul-claro (`#EAF0F7`), só linhas horizontais e números alinhados à direita; revisões vazias viram um aviso com borda tracejada. As capas (`capa.pdf` e `capa-final.pdf`) usam o fundo azul institucional, o logo amarelo e as duas linhas douradas na lateral direita.
+
 ## Fluxo
 
 1. `POST /intent/login` → sessão + Bearer (`adminUser.token`)
@@ -57,7 +59,7 @@ Log esperado:
 ```
 PDF com PHP/Dompdf — não usa npm/Node. Ignore "npm: command not found".
 Modo: CLI/HTTP → cadastrar-relatorio-coach + 1 PDF consolidado via PHP/Dompdf (TUTORY_PDF_ENGINE=dompdf)
-[Giovanna] TUTORY_PDF_ENGINE=dompdf — gerando o consolidado com PHP/Dompdf
+[Mychel] TUTORY_PDF_ENGINE=dompdf — gerando o consolidado com PHP/Dompdf
 ```
 
 ## Modelos-fonte (`RELATORIOS`)
@@ -106,7 +108,7 @@ Se `PASTA_DOWNLOAD` estiver vazio, usa `public/pdfs`.
 ## Uso
 
 ```bash
-# Regenerar só a Giovanna:
+# Regenerar só o Mychel (modo --teste):
 # período 1 = dias 01–15 do mês corrente
 # período 2 = dia 16 até o último dia do mês (no dia 1–15, usa o mês anterior)
 php artisan tutory:baixar-relatorios --periodo=1 --teste

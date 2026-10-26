@@ -31,13 +31,19 @@ final class RelatorioConsolidadoLayout
 
     public const ZEBRA = '#F8F9FB';
 
+    public const AZUL_SUAVE = '#EAF0F7';
+
+    public const DOURADO_VIVO = '#F2B705';
+
+    public const FUNDO_CARD = '#F5F7FA';
+
     public const WHATSAPP_URL = 'https://wa.me/message/I53LOYY2D7CNI1';
 
     public const CTA_ANALISE = 'Quero entrar em contato';
 
     public const INTRO_HISTORICO = 'Confira o histórico completo de horas cronometradas no período.';
 
-    public const TITULO_GRAFICO_PLANEJADAS = 'Horas planejadas x horas estudadas';
+    public const TITULO_GRAFICO_PLANEJADAS = 'Horas planejadas × horas estudadas';
 
     public const LEGENDA_HORAS_ESTUDADAS = 'Horas estudadas = horas brutas registradas.';
 
@@ -78,7 +84,7 @@ final class RelatorioConsolidadoLayout
         $mes = self::MESES[(int) $ref->format('n')] ?? mb_strtoupper($ref->format('F'));
         $n = $periodo === '2' ? '2' : '1';
 
-        return $mes . ' - PERÍODO ' . $n;
+        return $mes.' - PERÍODO '.$n;
     }
 
     public static function textoCabecalhoEsquerdo(): string
@@ -139,15 +145,16 @@ final class RelatorioConsolidadoLayout
             return '';
         }
 
-        $cls = trim('mn-sec ' . $classe);
-        $html = '<section class="' . $cls . '">';
+        $cls = trim('mn-sec '.$classe);
+        $html = '<section class="'.$cls.'">';
         $html .= '<div class="mn-sec-head">';
-        $html .= '<h2 class="mn-sec-title">' . htmlspecialchars($titulo, ENT_QUOTES, 'UTF-8') . '</h2>';
+        $html .= '<h2 class="mn-sec-title">'.htmlspecialchars($titulo, ENT_QUOTES, 'UTF-8').'</h2>';
+        $html .= '<div class="mn-sec-rule"></div>';
         if (trim($intro) !== '') {
-            $html .= '<p class="mn-sec-intro">' . htmlspecialchars($intro, ENT_QUOTES, 'UTF-8') . '</p>';
+            $html .= '<p class="mn-sec-intro">'.htmlspecialchars($intro, ENT_QUOTES, 'UTF-8').'</p>';
         }
         $html .= '</div>';
-        $html .= '<div class="mn-sec-body">' . $body . '</div>';
+        $html .= '<div class="mn-sec-body">'.$body.'</div>';
         $html .= '</section>';
 
         return $html;
@@ -161,10 +168,10 @@ final class RelatorioConsolidadoLayout
 
         $html = '<div class="mn-chart">';
         if (trim($subtitulo) !== '') {
-            $html .= '<p class="mn-chart-title">' . htmlspecialchars($subtitulo, ENT_QUOTES, 'UTF-8') . '</p>';
+            $html .= '<p class="mn-chart-title">'.htmlspecialchars($subtitulo, ENT_QUOTES, 'UTF-8').'</p>';
         }
         if (trim($legenda) !== '') {
-            $html .= '<p class="mn-chart-note">' . htmlspecialchars($legenda, ENT_QUOTES, 'UTF-8') . '</p>';
+            $html .= '<p class="mn-chart-note">'.htmlspecialchars($legenda, ENT_QUOTES, 'UTF-8').'</p>';
         }
         $html .= $imgHtml;
         $html .= '</div>';
@@ -175,11 +182,11 @@ final class RelatorioConsolidadoLayout
     /**
      * @param  list<array{label: string, value: string, destaque?: bool}>  $items
      */
-    public static function cards(array $items, int $maxCols = 4): string
+    public static function cards(array $items, int $maxCols = 4, bool $destacarPrimeiro = false): string
     {
         $items = array_values(array_filter(
             $items,
-            static fn(array $i): bool => trim((string) ($i['label'] ?? '') . ($i['value'] ?? '')) !== ''
+            static fn (array $i): bool => trim((string) ($i['label'] ?? '').($i['value'] ?? '')) !== ''
         ));
         if ($items === []) {
             return '';
@@ -189,17 +196,21 @@ final class RelatorioConsolidadoLayout
         $maxCols = max(1, $maxCols);
         $cols = $n <= $maxCols ? max($n, 1) : $maxCols;
         $linhas = array_chunk($items, $cols);
+        $primeiro = true;
         $html = '<table class="mn-kpis"><tbody>';
         foreach ($linhas as $linha) {
             $html .= '<tr>';
             $span = $cols - count($linha);
             foreach ($linha as $i => $item) {
-                $colspan = ($i === count($linha) - 1 && $span > 0) ? ' colspan="' . ($span + 1) . '"' : '';
+                $colspan = ($i === count($linha) - 1 && $span > 0) ? ' colspan="'.($span + 1).'"' : '';
+                $destaque = (bool) ($item['destaque'] ?? false) || ($destacarPrimeiro && $primeiro);
+                $primeiro = false;
                 $html .= self::htmlCardItem(
                     (string) $item['label'],
                     (string) $item['value'],
                     $colspan,
-                    $cols
+                    $cols,
+                    $destaque
                 );
             }
             $html .= '</tr>';
@@ -209,26 +220,27 @@ final class RelatorioConsolidadoLayout
         return $html;
     }
 
-    private static function htmlCardItem(string $label, string $valor, string $colspan, int $cols): string
+    private static function htmlCardItem(string $label, string $valor, string $colspan, int $cols, bool $destaque = false): string
     {
+        $hero = $destaque ? ' kpi-hero' : '';
         $labelHtml = htmlspecialchars($label, ENT_QUOTES, 'UTF-8');
         $valorHtml = htmlspecialchars($valor, ENT_QUOTES, 'UTF-8');
         if (self::eValorNumerico($valor)) {
             $compact = $cols >= 4;
-            $valorCls = 'kpi-value ' . self::classeTamanhoValor($valor, $cols);
+            $valorCls = 'kpi-value '.self::classeTamanhoValor($valor, $cols);
 
-            return '<td class="kpi kpi-num' . ($compact ? ' kpi-compact' : '') . '"' . $colspan . '>'
-                . '<div class="kpi-label">' . $labelHtml . '</div>'
-                . '<div class="' . $valorCls . '">' . $valorHtml . '</div>'
-                . '</td>';
+            return '<td class="kpi kpi-num'.($compact ? ' kpi-compact' : '').$hero.'"'.$colspan.'>'
+                .'<div class="kpi-label">'.$labelHtml.'</div>'
+                .'<div class="'.$valorCls.'">'.$valorHtml.'</div>'
+                .'</td>';
         }
 
-        return '<td class="kpi kpi-text"' . $colspan . '>'
-            . '<div class="kpi-stack">'
-            . '<div class="kpi-label">' . $labelHtml . '</div>'
-            . '<div class="kpi-value kpi-long">' . $valorHtml . '</div>'
-            . '</div>'
-            . '</td>';
+        return '<td class="kpi kpi-text'.$hero.'"'.$colspan.'>'
+            .'<div class="kpi-stack">'
+            .'<div class="kpi-label">'.$labelHtml.'</div>'
+            .'<div class="kpi-value kpi-long">'.$valorHtml.'</div>'
+            .'</div>'
+            .'</td>';
     }
 
     public static function eValorNumerico(string $valor): bool
@@ -279,21 +291,21 @@ final class RelatorioConsolidadoLayout
         }
         $larguras = self::largurasColunas($papeis);
 
-        $html = '<table class="' . $class . '"><colgroup>';
+        $html = '<table class="'.$class.'"><colgroup>';
         foreach ($papeis as $i => $papel) {
-            $html .= '<col class="mn-c-' . $papel . '" width="' . $larguras[$i] . '%" style="width:' . $larguras[$i] . '%">';
+            $html .= '<col class="mn-c-'.$papel.'" width="'.$larguras[$i].'%" style="width:'.$larguras[$i].'%">';
         }
         $html .= '</colgroup><thead><tr>';
         foreach ($headers as $i => $h) {
             $cls = self::classeColuna($papeis[$i] ?? 'texto');
-            $attr = $cls !== '' ? ' class="' . $cls . '"' : '';
-            $html .= '<th' . $attr . ' style="width:' . $larguras[$i] . '%">' . htmlspecialchars($h, ENT_QUOTES, 'UTF-8') . '</th>';
+            $attr = $cls !== '' ? ' class="'.$cls.'"' : '';
+            $html .= '<th'.$attr.' style="width:'.$larguras[$i].'%">'.htmlspecialchars($h, ENT_QUOTES, 'UTF-8').'</th>';
         }
         $html .= '</tr></thead><tbody>';
 
         foreach ($rows as $r => $cols) {
             $zebra = $r % 2 === 1 ? ' class="z"' : '';
-            $html .= '<tr' . $zebra . '>';
+            $html .= '<tr'.$zebra.'>';
             foreach ($cols as $i => $cell) {
                 if ($i === $percentCol) {
                     $html .= self::celulaPercentual($cell);
@@ -301,8 +313,8 @@ final class RelatorioConsolidadoLayout
                     continue;
                 }
                 $cls = self::classeColuna($papeis[$i] ?? 'texto');
-                $attr = $cls !== '' ? ' class="' . $cls . '"' : '';
-                $html .= '<td' . $attr . '>' . htmlspecialchars($cell, ENT_QUOTES, 'UTF-8') . '</td>';
+                $attr = $cls !== '' ? ' class="'.$cls.'"' : '';
+                $html .= '<td'.$attr.'>'.htmlspecialchars($cell, ENT_QUOTES, 'UTF-8').'</td>';
             }
             $html .= '</tr>';
         }
@@ -342,13 +354,13 @@ final class RelatorioConsolidadoLayout
 
         $maiusculo = mb_strtoupper($nome, 'UTF-8');
 
-        return '<p class="mn-aluno-nome">' . htmlspecialchars($maiusculo, ENT_QUOTES, 'UTF-8') . '</p>';
+        return '<p class="mn-aluno-nome">'.htmlspecialchars($maiusculo, ENT_QUOTES, 'UTF-8').'</p>';
     }
 
     public static function alunoBloco(string $nome, string $curso): string
     {
         return self::alunoNome($nome)
-            . ($curso !== '' ? '<p class="mn-aluno-curso">' . htmlspecialchars($curso, ENT_QUOTES, 'UTF-8') . '</p>' : '');
+            .($curso !== '' ? '<p class="mn-aluno-curso">'.htmlspecialchars($curso, ENT_QUOTES, 'UTF-8').'</p>' : '');
     }
 
     public static function css(string $fontCss, string $pieCss = '', string $fontFace = ''): string
@@ -359,6 +371,11 @@ final class RelatorioConsolidadoLayout
         $sec = self::TEXTO_SEC;
         $zebra = self::ZEBRA;
 
+        $ouroVivo = self::DOURADO_VIVO;
+        $suave = self::AZUL_SUAVE;
+        $borda = self::BORDA;
+        $fundoCard = self::FUNDO_CARD;
+
         return <<<CSS
 {$fontFace}
 @page{margin:34mm 16mm 18mm 16mm;}
@@ -366,73 +383,80 @@ html{font-family: {$fontCss}; font-size:10pt; color:{$texto}; padding:0; backgro
 body{font-family: {$fontCss}; font-size:10pt; color:{$texto}; margin:0; padding:0; background:#ffffff; line-height:1.45;}
 h1,h2,h3,h4,h5,h6,p,table,img,section,div{margin:0; padding:0;}
 img{max-width:100%; height:auto;}
-.mn-aluno-nome{font-size:26pt; font-weight:700; color:{$azul}; line-height:1.1; letter-spacing:-0.02em; text-transform:uppercase; margin:6px 0 18px; page-break-after:avoid;}
+.mn-aluno-nome{font-size:28pt; font-weight:700; color:{$azul}; line-height:1.05; letter-spacing:-0.02em; text-transform:uppercase; margin:4px 0 20px; page-break-after:avoid;}
 .mn-aluno-curso{font-size:10.5pt; font-weight:400; color:{$sec}; margin:0 0 8px;}
-.mn-sec{margin:0 0 28px;}
+.mn-sec{margin:0 0 30px;}
 .mn-sec-head{page-break-after:avoid; page-break-inside:avoid; margin:0;}
-.mn-sec-title{font-size:16.5pt; font-weight:700; color:{$azul}; letter-spacing:-0.01em; padding:0 0 0 12px; border-left:3.5px solid {$ouro}; line-height:1.2;}
-.mn-sec-intro{font-size:10.5pt; font-weight:400; color:{$sec}; margin:7px 0 0; padding-left:16px; page-break-after:avoid;}
+.mn-sec-title{font-size:16pt; font-weight:700; color:{$azul}; letter-spacing:-0.01em; line-height:1.2;}
+.mn-sec-rule{width:34px; height:3px; background:{$ouro}; margin:7px 0 0; font-size:0; line-height:0;}
+.mn-sec-intro{font-size:10.5pt; font-weight:400; color:{$sec}; margin:8px 0 0; page-break-after:avoid;}
 .mn-sec-body{margin-top:14px;}
 .mn-sec-keep{page-break-inside:avoid;}
 .mn-sec-insights{page-break-inside:auto;}
 .mn-sec-insights .mn-sec-head,.mn-sec-table .mn-sec-head{page-break-after:avoid;}
-.mn-sec-insights .mn-kpis{border-spacing:14px 14px;}
-.mn-kpis{width:100%; border-collapse:separate; border-spacing:14px 0; table-layout:fixed; margin:0 0 8px;}
-.mn-kpis td.kpi{background:#ffffff; border:1.5pt solid {$ouro}; border-radius:9px; padding:18px 18px; vertical-align:middle; page-break-inside:avoid;}
+.mn-sec-insights .mn-kpis{border-spacing:10px 10px;}
+.mn-kpis{width:100%; border-collapse:separate; border-spacing:10px 0; table-layout:fixed; margin:0 -10px 8px;}
+.mn-kpis td.kpi{background:#ffffff; border:1pt solid {$borda}; border-radius:10px; padding:14px 16px; vertical-align:middle; page-break-inside:avoid;}
 .mn-kpis td.kpi.kpi-num{vertical-align:top;}
+.mn-kpis td.kpi.kpi-hero{background:{$azul}; border-color:{$azul};}
+.mn-kpis td.kpi-hero .kpi-label{color:#C9D3E6;}
+.mn-kpis td.kpi-hero .kpi-value{color:{$ouroVivo};}
 .kpi-inner{width:100%; border-collapse:collapse; border-spacing:0; table-layout:fixed; margin:0; padding:0; border:0;}
 .kpi-inner col.kpi-c-label{width:40%;}
 .kpi-inner col.kpi-c-value{width:60%;}
 .kpi-inner td{border:0; margin:0; padding:0; vertical-align:middle; background:transparent;}
 .kpi-row{display:table; width:100%; table-layout:fixed; margin:0; padding:0; border:0;}
 .kpi-stack{display:block; width:100%; margin:0; padding:0;}
-.kpi-label{font-size:9.5pt; font-weight:600; color:{$sec}; letter-spacing:0.04em; text-transform:uppercase; margin:0; line-height:1.15; text-align:left;}
+.kpi-label{font-size:8pt; font-weight:600; color:{$sec}; letter-spacing:0.06em; text-transform:uppercase; margin:0; line-height:1.15; text-align:left;}
 .kpi-value{font-size:21pt; font-weight:700; color:{$azul}; line-height:0.95; text-align:left; word-wrap:break-word; overflow-wrap:break-word; word-break:normal; padding:0; white-space:nowrap; letter-spacing:-0.03em;}
 .kpi-row .kpi-label,.kpi-row .kpi-value{display:table-cell; vertical-align:middle;}
-.kpi-num .kpi-label{display:block; width:auto; max-width:92%; margin:0 0 2px; padding:0; font-size:8pt; line-height:1.12; font-weight:600;}
-.kpi-num .kpi-value{display:block; width:auto; max-width:100%; margin:4px 0 0; padding:0; font-weight:700; text-align:left; white-space:nowrap; letter-spacing:-0.04em; line-height:0.92;}
+.kpi-num .kpi-label{display:block; width:auto; max-width:96%; margin:0 0 2px; padding:0; font-size:7.5pt; line-height:1.15; font-weight:600;}
+.kpi-num .kpi-value{display:block; width:auto; max-width:100%; margin:8px 0 0; padding:0; font-weight:700; text-align:left; white-space:nowrap; letter-spacing:-0.03em; line-height:0.95;}
 .kpi-num .kpi-v-a{font-size:24pt;}
 .kpi-num .kpi-v-b{font-size:22pt;}
 .kpi-num .kpi-v-c{font-size:20pt;}
 .kpi-num .kpi-v-d{font-size:18pt;}
 .kpi-num .kpi-v-e{font-size:16pt;}
-.kpi-compact .kpi-label{font-size:8pt; line-height:1.12;}
-.kpi-compact .kpi-v-a{font-size:20pt;}
-.kpi-compact .kpi-v-b{font-size:18pt;}
-.kpi-compact .kpi-v-c{font-size:16.5pt;}
-.kpi-compact .kpi-v-d{font-size:15pt;}
-.kpi-compact .kpi-v-e{font-size:13.5pt;}
+.kpi-compact .kpi-label{font-size:7.5pt; line-height:1.15;}
+.kpi-compact .kpi-v-a{font-size:21pt;}
+.kpi-compact .kpi-v-b{font-size:19pt;}
+.kpi-compact .kpi-v-c{font-size:17pt;}
+.kpi-compact .kpi-v-d{font-size:15.5pt;}
+.kpi-compact .kpi-v-e{font-size:14pt;}
 .kpi-text .kpi-label{margin:0 0 6px; line-height:1.20;}
-.kpi-long{font-size:11.5pt; font-weight:700; line-height:1.20; text-align:left; padding:0; white-space:normal; letter-spacing:0;}
-.mn-chart{margin:8px 0 16px; page-break-inside:avoid;}
-.mn-chart-title{font-size:11pt; font-weight:600; color:{$azul}; margin:0 0 8px;}
-.mn-chart-note{font-size:9.5pt; font-weight:400; color:{$sec}; margin:0 0 12px;}
-.chart{width:100%; max-width:100%; margin:8px 0 0;}
+.kpi-long{font-size:11.5pt; font-weight:700; line-height:1.25; text-align:left; padding:0; white-space:normal; letter-spacing:0;}
+.mn-chart{margin:0 0 14px; padding:14px 16px 12px; border:1pt solid {$borda}; border-radius:10px; background:#ffffff; page-break-inside:avoid;}
+.mn-chart-title{font-size:10.5pt; font-weight:700; color:{$azul}; margin:0 0 4px;}
+.mn-chart-note{font-size:8.5pt; font-weight:400; color:{$sec}; margin:0 0 8px;}
+.chart{width:100%; max-width:100%; margin:6px 0 0;}
 {$pieCss}
-.mn-table{width:100%; max-width:100%; border-collapse:collapse; font-size:9pt; table-layout:fixed; margin:0; border:1.25pt solid {$azul};}
+.mn-table{width:100%; max-width:100%; border-collapse:separate; border-spacing:0; font-size:9pt; table-layout:fixed; margin:0; border:1pt solid {$borda}; border-radius:10px;}
 .mn-table thead{display:table-header-group;}
-.mn-table th,.mn-table td{height:auto; border:1.25pt solid {$azul};}
-.mn-table th{background:{$azul}; color:#ffffff; font-weight:600; font-size:9pt; letter-spacing:0.03em; text-transform:uppercase; padding:9px 11px; text-align:left; vertical-align:middle; white-space:normal;}
+.mn-table th,.mn-table td{height:auto; border:0; border-bottom:0.75pt solid {$borda};}
+.mn-table th{background:{$suave}; color:{$azul}; font-weight:700; font-size:7.5pt; letter-spacing:0.06em; text-transform:uppercase; padding:9px 11px; text-align:left; vertical-align:middle; white-space:normal;}
 .mn-table th.num{text-align:right;}
-.mn-table th.mn-disc,.mn-table th.mn-assunto,.mn-table th.mn-mod,.mn-table th.mn-horas,.mn-table th.mn-qtd,.mn-table th.mn-pct{text-align:center; vertical-align:middle;}
+.mn-table th.mn-horas,.mn-table th.mn-qtd,.mn-table th.mn-pct{text-align:right;}
 .mn-table td.num{white-space:nowrap;}
 .mn-table td.mn-horas{white-space:nowrap;}
-.mn-table td{padding:9px 11px; vertical-align:middle; color:{$texto}; word-wrap:break-word; overflow-wrap:break-word; word-break:normal; font-size:9pt; font-weight:400; line-height:1.15; white-space:normal;}
-.mn-table td.mn-assunto,.mn-table td.mn-disc,.mn-table td.mn-mod{white-space:normal; word-wrap:break-word; overflow-wrap:break-word;}
-.mn-table td.mn-disc,.mn-table td.mn-mod,.mn-table td.mn-horas,.mn-table td.num,.mn-table td.mn-assunto{text-align:center; vertical-align:middle;}
-.mn-table td.mn-pct{text-align:center;}
-.mn-table tr.z td{background:{$zebra};}
+.mn-table td{padding:9px 11px; vertical-align:middle; color:{$texto}; word-wrap:break-word; overflow-wrap:break-word; word-break:normal; font-size:9pt; font-weight:400; line-height:1.3; white-space:normal;}
+.mn-table td.mn-assunto,.mn-table td.mn-disc,.mn-table td.mn-mod{white-space:normal; word-wrap:break-word; overflow-wrap:break-word; text-align:left;}
+.mn-table td.mn-disc{font-weight:600; color:{$azul};}
+.mn-table td.mn-mod{color:{$sec}; font-size:8.5pt;}
+.mn-table td.mn-horas,.mn-table td.num{text-align:right; font-weight:600; color:{$azul};}
+.mn-table td.mn-pct{text-align:right;}
+.mn-table tr.z td{background:{$fundoCard};}
+.mn-table tbody tr:last-child td{border-bottom:0;}
 .mn-table tr{page-break-inside:avoid; break-inside:avoid; height:auto;}
 .mn-table thead{page-break-after:avoid;}
 .mn-table tbody tr:first-child,.mn-table tbody tr:nth-child(2){page-break-before:avoid;}
-.pct{font-weight:600; font-size:9.5pt;}
-.bar-track{display:block; height:3px; background:#EEF0F3; margin:6px auto 0; width:72px; overflow:hidden;}
-.bar-fill{display:block; height:3px;}
+.pct{font-weight:700; font-size:10pt;}
+.bar-track{display:block; height:4px; background:#EEF0F3; margin:5px 0 0 auto; width:64px; overflow:hidden; border-radius:2px;}
+.bar-fill{display:block; height:4px; border-radius:2px;}
 .mn-insight-item,.mn-insight-block{page-break-inside:avoid; margin:0 0 16px;}
 .mn-insight-block{padding:10px 0 10px 12px; border-left:2px solid {$ouro};}
 .mn-insight-label{font-size:8.5pt; font-weight:500; color:{$sec}; letter-spacing:0.03em; text-transform:uppercase; margin:0 0 6px;}
 .mn-insight-value{font-size:10pt; font-weight:600; color:{$azul}; line-height:1.35;}
-.empty{color:#6B7280; text-align:left; font-size:10pt; padding:8px 0;}
+.empty{color:{$sec}; text-align:left; font-size:10pt; padding:14px 16px; margin:10px 0 0; border:1pt dashed #C9D0DB; border-radius:10px; background:{$fundoCard};}
 .keep{page-break-inside:avoid;}
 CSS;
     }
@@ -503,7 +527,7 @@ CSS;
         if (preg_match('/[|•]/u', $texto)) {
             $partes = preg_split('/\s*[|•]\s*/u', $texto) ?: [];
 
-            return array_values(array_filter(array_map('trim', $partes), static fn(string $p): bool => $p !== ''));
+            return array_values(array_filter(array_map('trim', $partes), static fn (string $p): bool => $p !== ''));
         }
         if (preg_match_all(
             '/(?:m[eé]dia(?:\s+di[aá]ria|\s+de)?|exerc[ií]cios(?:\s+realizados)?|acertos|taxa(?:\s+de)?\s+acertos)\s*[:\s]\s*(?:\d{1,2}:\d{2}(?::\d{2})?|\d+(?:[.,]\d+)?%?)/iu',
@@ -576,9 +600,9 @@ CSS;
     {
         $html = '<div class="mn-insight-block">';
         if ($label !== '') {
-            $html .= '<div class="mn-insight-label">' . htmlspecialchars($label, ENT_QUOTES, 'UTF-8') . '</div>';
+            $html .= '<div class="mn-insight-label">'.htmlspecialchars($label, ENT_QUOTES, 'UTF-8').'</div>';
         }
-        $html .= '<div class="mn-insight-value">' . htmlspecialchars($valor, ENT_QUOTES, 'UTF-8') . '</div>';
+        $html .= '<div class="mn-insight-value">'.htmlspecialchars($valor, ENT_QUOTES, 'UTF-8').'</div>';
         $html .= '</div>';
 
         return $html;
@@ -591,7 +615,7 @@ CSS;
     {
         $hex = ltrim($hex, '#');
         if (strlen($hex) === 3) {
-            $hex = $hex[0] . $hex[0] . $hex[1] . $hex[1] . $hex[2] . $hex[2];
+            $hex = $hex[0].$hex[0].$hex[1].$hex[1].$hex[2].$hex[2];
         }
 
         return [
@@ -605,12 +629,12 @@ CSS;
     {
         $n = self::parsePct($taxa);
         $cor = self::corPercentual($n);
-        $html = '<td class="num mn-pct"><span class="pct" style="color:' . htmlspecialchars($cor, ENT_QUOTES, 'UTF-8') . ';">'
-            . htmlspecialchars($taxa, ENT_QUOTES, 'UTF-8') . '</span>';
+        $html = '<td class="num mn-pct"><span class="pct" style="color:'.htmlspecialchars($cor, ENT_QUOTES, 'UTF-8').';">'
+            .htmlspecialchars($taxa, ENT_QUOTES, 'UTF-8').'</span>';
         if ($n !== null) {
             $w = max(0, min(100, $n));
-            $html .= '<span class="bar-track"><span class="bar-fill" style="width:' . $w . '%;background:'
-                . htmlspecialchars($cor, ENT_QUOTES, 'UTF-8') . ';"></span></span>';
+            $html .= '<span class="bar-track"><span class="bar-fill" style="width:'.$w.'%;background:'
+                .htmlspecialchars($cor, ENT_QUOTES, 'UTF-8').';"></span></span>';
         }
         $html .= '</td>';
 

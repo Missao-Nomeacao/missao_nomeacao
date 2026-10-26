@@ -104,7 +104,7 @@ Comando de entrada: `php artisan tutory:baixar-relatorios`.
 
 - `--periodo=1` — dias 01–15 do mês corrente
 - `--periodo=2` — dia 16 até o último dia do mês (nos dias 1–15, o mês anterior)
-- `--teste` — só a aluna Giovanna; não grava a trava de envio
+- `--teste` — só o aluno Mychel; não grava a trava de envio
 - `--se-pendente` — não reenvia se aquele período do mês já concluiu
 
 O service é `App\Services\Tutory\CoachReportDownloader`. Fluxo: login na Tutory, lista de alunos ativos, cinco HTMLs oficiais por aluno (`desempenho`, `aluno`, `horas-liquidas`, `questoes`, `progresso`), um PDF consolidado, avaliação, e-mail, e **apagar os PDFs** da pasta de download. Logs `log_download_*.txt` permanecem.
@@ -115,7 +115,7 @@ O e-mail com o PDF sai só quando as três condições valem juntas:
 2. O cadastro em `alunos` tem o mesmo nome do arquivo `relatorio_consolidado_*`.
 3. `recebe_email` está marcado e o e-mail é válido. Sem o checkbox, as faixas ainda são gravadas e o e-mail não sai.
 
-O sync das 06:00 volta a marcar `recebe_email` em quem continua ativo na Tutory. Desmarcado no admin, o envio segura só até essa sincronização. **Aluno teste** e **Nayara Oliveira** não estão na tabela local, então não recebem o e-mail. `--teste` limita geração e envio a quem tem "Giovanna" no nome. O agendado manda uma vez por quinzena (`--se-pendente`): período 1 no dia 16, período 2 no dia 1.
+O sync das 06:00 volta a marcar `recebe_email` em quem continua ativo na Tutory. Desmarcado no admin, o envio segura só até essa sincronização. **Aluno teste** e **Nayara Oliveira** não estão na tabela local, então não recebem o e-mail. `--teste` limita geração e envio a quem tem "Mychel" no nome. O agendado manda uma vez por quinzena (`--se-pendente`): período 1 no dia 16, período 2 no dia 1.
 
 O PDF final não é a junção dos cinco PDFs oficiais. A ordem é capa institucional, seções extraídas sem alterar os números da Tutory, capa final. Identidade do PDF: azul `#001D3D`, dourado `#BF8F00`, Inter, cabeçalho `MISSÃO NOMEAÇÃO`. Capas em `resources/relatorios/capa.pdf` e `capa-final.pdf`.
 

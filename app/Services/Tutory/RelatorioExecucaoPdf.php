@@ -41,7 +41,7 @@ class RelatorioExecucaoPdf
             $conclusao .= '<p>'.$e($paragrafo).'</p>';
         }
 
-        $teste = $resumo->teste ? '<p class="meta">Modo teste: apenas a aluna Giovanna.</p>' : '';
+        $teste = $resumo->teste ? '<p class="meta">Modo teste: apenas o aluno Mychel.</p>' : '';
         $nota = $resumo->nota !== null && $resumo->nota !== ''
             ? '<p class="meta">'.$e($resumo->nota).'</p>'
             : '';

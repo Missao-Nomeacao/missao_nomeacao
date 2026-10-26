@@ -39,7 +39,7 @@ class CoachReportDownloader
 {
     private const BASE = 'https://admin.tutory.com.br';
 
-    private const ALUNA_TESTE = 'Giovanna';
+    private const ALUNO_TESTE = 'Mychel';
 
     private const MAX_TENTATIVAS = 3;
 
@@ -1352,7 +1352,7 @@ class CoachReportDownloader
             $items[] = ['label' => $label, 'value' => $value];
         }
 
-        return RelatorioConsolidadoLayout::cards($items);
+        return RelatorioConsolidadoLayout::cards($items, 4, true);
     }
 
     private function htmlTabelaPorId(DOMXPath $xp, string $id): string
@@ -1659,7 +1659,7 @@ class CoachReportDownloader
         $query = Aluno::query()->orderBy('nome');
         $alunos = $query->get();
         if ($this->teste) {
-            $alvo = mb_strtolower(self::ALUNA_TESTE);
+            $alvo = mb_strtolower(self::ALUNO_TESTE);
             $alunos = $alunos
                 ->filter(static fn (Aluno $a) => str_contains(mb_strtolower($a->nome), $alvo))
                 ->values();
@@ -3640,7 +3640,7 @@ HTML;
 
         $alunos = $this->semAlunosNovatos($this->coletarAlunosAtivos());
         if ($this->teste) {
-            $alvo = mb_strtolower(self::ALUNA_TESTE);
+            $alvo = mb_strtolower(self::ALUNO_TESTE);
             $alunos = array_values(array_filter(
                 $alunos,
                 static fn (array $a) => str_contains(mb_strtolower($a['nome']), $alvo)
@@ -3648,7 +3648,7 @@ HTML;
             if ($alunos !== []) {
                 $this->log('Modo --teste: '.$alunos[0]['nome'].' (id '.$alunos[0]['id'].')');
             } else {
-                $this->log("Modo --teste: '".self::ALUNA_TESTE."' não encontrada.");
+                $this->log("Modo --teste: '".self::ALUNO_TESTE."' não encontrado.");
             }
         }
 

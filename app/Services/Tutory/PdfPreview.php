@@ -17,14 +17,14 @@ final class PdfPreview
         }
         $fontCss = PdfFontes::css($chave);
         $css = RelatorioConsolidadoLayout::css($fontCss, '', PdfFontes::fontFaceCss($chave));
-        $rotulo = RelatorioConsolidadoLayout::rotuloPeriodo('1', new \DateTimeImmutable('2026-08-01'));
+        $rotulo = RelatorioConsolidadoLayout::rotuloPeriodo('2', new \DateTimeImmutable('2026-09-16'));
 
         $cards = RelatorioConsolidadoLayout::cards([
-            ['label' => 'Total de Horas', 'value' => '979:00'],
-            ['label' => '% de acertos', 'value' => '84%'],
-            ['label' => 'Questões', 'value' => '282'],
-            ['label' => 'Progresso geral', 'value' => '0%'],
-        ]);
+            ['label' => 'Total de Horas', 'value' => '638:45'],
+            ['label' => 'Dias de estudo', 'value' => '234'],
+            ['label' => '% de acertos', 'value' => '80%'],
+            ['label' => 'Progresso geral', 'value' => '23%'],
+        ], 4, true);
 
         $ritmo = RelatorioConsolidadoLayout::grafico(
             RelatorioConsolidadoLayout::TITULO_GRAFICO_PLANEJADAS,
@@ -33,27 +33,27 @@ final class PdfPreview
         );
 
         $insights = RelatorioConsolidadoLayout::insights([
-            'Média diária 00:00',
-            'A matéria mais estudada foi Direito Constitucional.',
-            'A matéria menos estudada foi SEDES - PORTUGUÊS.',
-            'A matéria com maior solicitação de tempo extra foi SEDES - CONHECIMENTOS BÁSICOS.',
-            'Exercícios realizados 282',
-            'Acertos 306',
-            'Taxa de acertos 84%',
+            'Média diária 02:39',
+            'A matéria mais estudada foi PMSC - Português.',
+            'A matéria menos estudada foi PMSC - Direito Constitucional.',
+            'Exercícios realizados 319',
+            'Acertos 254',
+            'Taxa de acertos 79,6%',
         ]);
 
         $questoes = RelatorioConsolidadoLayout::cards([
-            ['label' => 'Questões realizadas', 'value' => '282'],
-            ['label' => 'Acertos', 'value' => '306'],
-            ['label' => 'Percentual de acertos', 'value' => '83,7%'],
+            ['label' => 'Questões realizadas', 'value' => '319'],
+            ['label' => 'Acertos', 'value' => '254'],
+            ['label' => 'Percentual de acertos', 'value' => '79,6%'],
         ]);
 
         $assuntos = RelatorioConsolidadoLayout::tabela(
             ['Disciplina', 'Assunto', 'Taxa de Acertos'],
             [
-                ['Direito Administrativo', 'Improbidade administrativa e o dever de probidade na administração pública', '55%'],
-                ['Direito Constitucional', 'Organização do Estado', '82%'],
-                ['Português', 'Concordância verbal', '71%'],
+                ['PMSC - Direito Penal Militar', 'Suspensão condicional da pena', '85,0%'],
+                ['PMSC - Direito Processual Penal', 'Título II: Inquérito policial (art. 4º ao 23)', '82,7%'],
+                ['PMSC - Direito Processual Penal', 'Título III: Ação penal', '75,8%'],
+                ['PMSC - Legislação de Trânsito', 'Lei nº 9.503/1997: Dos veículos (art. 96 ao 117)', '75,0%'],
             ],
             ['numeric' => [2], 'percent_col' => 2]
         );
@@ -61,8 +61,8 @@ final class PdfPreview
         $revisoes = RelatorioConsolidadoLayout::tabela(
             ['Disciplina revisada', 'Assunto revisado', 'Revisões no período'],
             [
-                ['Direito Penal', 'Teoria do crime', '3'],
-                ['Direito Constitucional', 'Controle de constitucionalidade', '1'],
+                ['PMSC - Direito Penal Geral', 'Crime: fato típico', '2'],
+                ['PMSC - Português', 'Compreensão e interpretação de textos', '1'],
             ],
             ['numeric' => [2]]
         );
@@ -70,16 +70,18 @@ final class PdfPreview
         $historico = RelatorioConsolidadoLayout::tabela(
             ['Disciplina', 'Assunto', 'Modalidade', 'Horas'],
             [
-                ['SEDES - ADMINISTRAÇÃO DE RECURSOS DE MATERIAIS', 'Inventário e controle de estoque de materiais permanentes e de consumo', 'Cadernos de Exercícios (Múltipla Escolha)', '01:12:40'],
-                ['Direito Constitucional', 'Organização do Estado', 'Videoaula', '00:45:00'],
+                ['PMSC - Português', 'Compreensão e interpretação de textos', 'Estudo (coach)', '07:51:35'],
+                ['PMSC - Direito Penal Especial', 'Crimes contra o patrimônio: furto, roubo e extorsão (arts. 155 a 160)', 'Estudo', '04:20:00'],
+                ['PMSC - Direito Processual Penal', 'Título III: Ação penal', 'Exercício', '03:37:00'],
+                ['PMSC - Legislação Especial', 'Estatuto do Idoso (Lei nº 10.741/2003)', 'Estudo por vídeos', '00:45:07'],
             ],
             ['numeric' => [3]]
         );
 
-        $secoes = RelatorioConsolidadoLayout::alunoNome('Giovanna')
+        $secoes = RelatorioConsolidadoLayout::alunoNome('Mychel')
             .RelatorioConsolidadoLayout::secao(
                 'Seu desempenho',
-                'Pré-edital · Delegado de Polícia — São Paulo',
+                'CFP · PMSC',
                 $cards,
                 'mn-sec-keep'
             )
