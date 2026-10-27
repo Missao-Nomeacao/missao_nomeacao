@@ -89,10 +89,11 @@ class RelatorioPdfCapasTest extends TestCase
 
             $this->assertStringNotContainsString('Página', $capa);
             $this->assertStringNotContainsString('Página', $final);
-            $this->assertStringContainsString('Página 1 de', $miolo);
-            $this->assertStringContainsString('GIOVANNA', $miolo);
-            $this->assertStringContainsString('MISSÃO NOMEAÇÃO', $miolo);
-            $this->assertStringNotContainsString('Página 1 de '.($paginas), $miolo);
+            $this->assertStringContainsString('Mychel', $capa);
+            $this->assertStringContainsString('16 a 30 de setembro', $capa);
+            $this->assertStringContainsStringIgnoringCase('Resumo da quinzena', $miolo);
+            $this->assertStringContainsString('Para onde foram as suas horas', $miolo);
+            $this->assertStringContainsString('Missão Nomeação', $final);
         } finally {
             @unlink($tmp);
         }

@@ -37,7 +37,7 @@ final class RelatorioConsolidadoLayout
 
     public const INTRO_HISTORICO = 'Confira o histórico completo de horas cronometradas no período.';
 
-    public const TITULO_GRAFICO_PLANEJADAS = 'Horas planejadas x horas estudadas';
+    public const TITULO_GRAFICO_PLANEJADAS = 'Horas planejadas × horas estudadas';
 
     public const LEGENDA_HORAS_ESTUDADAS = 'Horas estudadas = horas brutas registradas.';
 
@@ -331,6 +331,28 @@ final class RelatorioConsolidadoLayout
         }
 
         return self::cards($items, 3);
+    }
+
+    /**
+     * Pares RÓTULO + VALOR do Painel de Insights, sem montar HTML.
+     *
+     * @param  list<string>  $paragrafos
+     * @return list<array{label: string, value: string}>
+     */
+    public static function paresInsight(array $paragrafos): array
+    {
+        $items = [];
+        foreach ($paragrafos as $p) {
+            $p = trim(preg_replace('/\s+/u', ' ', (string) $p) ?? '');
+            if ($p === '' || preg_match('/painel de insights/iu', $p)) {
+                continue;
+            }
+            foreach (self::extrairParesInsight($p) as $par) {
+                $items[] = ['label' => $par[0], 'value' => $par[1]];
+            }
+        }
+
+        return $items;
     }
 
     public static function alunoNome(string $nome): string

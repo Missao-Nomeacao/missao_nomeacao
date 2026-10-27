@@ -7,21 +7,21 @@ use App\Services\Tutory\CoachReportDownloader;
 use ReflectionClass;
 use Tests\TestCase;
 
-class AlunaTesteRelatorioTest extends TestCase
+class AlunoTesteRelatorioTest extends TestCase
 {
-    public function test_aluna_teste_e_giovanna(): void
+    public function test_aluno_teste_e_mychel(): void
     {
         $ref = new ReflectionClass(CoachReportDownloader::class);
 
-        $this->assertSame('Giovanna', $ref->getConstant('ALUNA_TESTE'));
+        $this->assertSame('Mychel', $ref->getConstant('ALUNO_TESTE'));
     }
 
-    public function test_comando_describe_giovanna_no_modo_teste(): void
+    public function test_comando_descreve_mychel_no_modo_teste(): void
     {
         $comando = new BaixarRelatoriosTutoryCommand;
         $descricao = $comando->getDefinition()->getOption('teste')->getDescription();
 
-        $this->assertStringContainsString('Giovanna', $descricao);
-        $this->assertStringNotContainsString('Laíra', $descricao);
+        $this->assertStringContainsString('Mychel', $descricao);
+        $this->assertStringNotContainsString('Giovanna', $descricao);
     }
 }

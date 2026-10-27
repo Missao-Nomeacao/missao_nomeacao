@@ -24,7 +24,7 @@ O fuso de negócio é **America/Sao_Paulo** (UTC−3 o ano inteiro). Horário de
 - PHP 8.2, Laravel 12, Eloquent, Blade, sessão em banco
 - Banco padrão e de produção: **SQLite** (`database/database.sqlite`). PHPUnit usa SQLite `:memory:`
 - Tailwind via CDN nas páginas Blade (landing e admin). Vite + Tailwind 4 existem em `resources/css/app.css`, mas as telas em uso não dependem do build
-- PDF em produção: **PHP/Dompdf** (`dompdf/dompdf`, `setasign/fpdi`). Gráficos via QuickChart
+- PDF em produção: **PHP/Dompdf** (`dompdf/dompdf`, `setasign/fpdi`). Gráficos do relatório quinzenal em GD (`GraficosRelatorioQuinzenal`); QuickChart só nos PDFs individuais
 - Puppeteer (`scripts/tutory-*.mjs`) é opcional e fica desligado. O servidor compartilhado **não tem Node nem npm**
 - E-mail SMTP. Todo envio (lead, inscrição, relatório) sai com CCO `MAIL_BCC_ADDRESS` (padrão `nayara@missaonomeacao.com.br`, em `config/mail.php`)
 - Auth do admin: `Auth::attempt` em `LoginController`. Não há policies nem gates. Rotas de `/admin` usam o middleware `auth`
@@ -104,7 +104,7 @@ Comando de entrada: `php artisan tutory:baixar-relatorios`.
 
 - `--periodo=1` — dias 01–15 do mês corrente
 - `--periodo=2` — dia 16 até o último dia do mês (nos dias 1–15, o mês anterior)
-- `--teste` — só a aluna Giovanna; não grava a trava de envio
+- `--teste` — só o aluno Mychel; não grava a trava de envio
 - `--se-pendente` — não reenvia se aquele período do mês já concluiu
 
 O service é `App\Services\Tutory\CoachReportDownloader`. Fluxo: login na Tutory, lista de alunos ativos, cinco HTMLs oficiais por aluno (`desempenho`, `aluno`, `horas-liquidas`, `questoes`, `progresso`), um PDF consolidado, avaliação, e-mail, e **apagar os PDFs** da pasta de download. Logs `log_download_*.txt` permanecem.
@@ -115,9 +115,9 @@ O e-mail com o PDF sai só quando as três condições valem juntas:
 2. O cadastro em `alunos` tem o mesmo nome do arquivo `relatorio_consolidado_*`.
 3. `recebe_email` está marcado e o e-mail é válido. Sem o checkbox, as faixas ainda são gravadas e o e-mail não sai.
 
-O sync das 06:00 volta a marcar `recebe_email` em quem continua ativo na Tutory. Desmarcado no admin, o envio segura só até essa sincronização. **Aluno teste** e **Nayara Oliveira** não estão na tabela local, então não recebem o e-mail. `--teste` limita geração e envio a quem tem "Giovanna" no nome. O agendado manda uma vez por quinzena (`--se-pendente`): período 1 no dia 16, período 2 no dia 1.
+O sync das 06:00 volta a marcar `recebe_email` em quem continua ativo na Tutory. Desmarcado no admin, o envio segura só até essa sincronização. **Aluno teste** e **Nayara Oliveira** não estão na tabela local, então não recebem o e-mail. `--teste` limita geração e envio a quem tem "Mychel" no nome. O agendado manda uma vez por quinzena (`--se-pendente`): período 1 no dia 16, período 2 no dia 1.
 
-O PDF final não é a junção dos cinco PDFs oficiais. A ordem é capa institucional, seções extraídas sem alterar os números da Tutory, capa final. Identidade do PDF: azul `#001D3D`, dourado `#BF8F00`, Inter, cabeçalho `MISSÃO NOMEAÇÃO`. Capas em `resources/relatorios/capa.pdf` e `capa-final.pdf`.
+O PDF final não é a junção dos cinco PDFs oficiais. `montarDadosRelatorio` extrai os dados sem alterar os números da Tutory (`DadosRelatorioQuinzenal`) e `RelatorioQuinzenalPdf` monta o layout aprovado: capa com nome, curso e período, resumo, ritmo, questões, assuntos, revisões, histórico por disciplina e última folha. Identidade: azul `#0B1F3F`, dourado `#F2B705`, Montserrat + Nunito Sans. Fundo e logo da capa em `resources/relatorios/`; a última folha é `capa-final.pdf`. Detalhes em `docs/tutory-relatorios.md`.
 
 Motor padrão: `TUTORY_PDF_ENGINE=dompdf`. Não troque o padrão para Puppeteer e não acrescente `npm install` ao deploy.
 

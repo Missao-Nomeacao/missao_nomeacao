@@ -39,7 +39,7 @@ class CoachReportDownloader
 {
     private const BASE = 'https://admin.tutory.com.br';
 
-    private const ALUNA_TESTE = 'Giovanna';
+    private const ALUNO_TESTE = 'Mychel';
 
     private const MAX_TENTATIVAS = 3;
 
@@ -1192,40 +1192,16 @@ class CoachReportDownloader
      */
     private function gerarPdfConsolidadoDoHtml(string $nome, array $htmlPorModelo, string $destino): bool
     {
-        $this->log("[{$nome}] Fallback Dompdf: compondo o consolidado a partir dos HTMLs oficiais...");
-
-        $desempenho = $htmlPorModelo['desempenho'] ?? '';
-        $aluno = $htmlPorModelo['aluno'] ?? '';
-        $horas = $htmlPorModelo['horas-liquidas'] ?? '';
-        $questoes = $htmlPorModelo['questoes'] ?? '';
-        $progresso = $htmlPorModelo['progresso'] ?? '';
-
-        $xpDes = $this->loadDom($desempenho);
-        $xpAluno = $this->loadDom($aluno);
-        $xpHoras = $this->loadDom($horas);
-        $xpQuestoes = $this->loadDom($questoes);
-        $xpProgresso = $this->loadDom($progresso);
-
-        $pdfHtml = $this->montarHtmlConsolidado($xpDes, $xpAluno, $xpHoras, $xpQuestoes, $xpProgresso, $horas, $questoes, $progresso);
+        $this->log("[{$nome}] Dompdf: compondo o relatório quinzenal a partir dos HTMLs oficiais...");
 
         try {
-            $dompdf = new Dompdf($this->opcoesDompdfConsolidado());
-            PdfFontes::aplicarNoDompdf($dompdf);
-            $dompdf->loadHtml($pdfHtml, 'UTF-8');
-            $dompdf->setPaper('A4', 'portrait');
-            $dompdf->render();
-            RelatorioConsolidadoLayout::aplicarCabecalhoRodape(
-                $dompdf,
-                RelatorioConsolidadoLayout::rotuloPeriodo($this->periodo, $this->mesDoPeriodo())
-            );
-            $bytes = $dompdf->output() ?? '';
-            if ($bytes === '' || strlen($bytes) < 500) {
-                $this->log("[{$nome}] Fallback Dompdf gerou PDF vazio");
+            $dados = $this->montarDadosRelatorio($htmlPorModelo);
+            RelatorioQuinzenalPdf::gerar($dados, $destino);
+            if (! is_file($destino) || filesize($destino) < 500) {
+                $this->log("[{$nome}] Dompdf gerou PDF vazio");
 
                 return false;
             }
-            file_put_contents($destino, $bytes);
-            RelatorioPdfCapas::aplicar($destino);
             $this->log("[{$nome}] Relatório consolidado (Dompdf) salvo: {$destino}");
 
             return true;
@@ -1237,68 +1213,246 @@ class CoachReportDownloader
     }
 
     /**
-     * HTML modular do consolidado (ordem fixa; seções vazias são omitidas).
+     * Dados do relatório quinzenal (novo layout), extraídos dos cinco HTMLs oficiais.
+     *
+     * @param  array<string, string>  $htmlPorModelo
      */
-    private function montarHtmlConsolidado(
-        DOMXPath $xpDes,
-        DOMXPath $xpAluno,
-        DOMXPath $xpHoras,
-        DOMXPath $xpQuestoes,
-        DOMXPath $xpProgresso,
-        string $htmlHoras,
-        string $htmlQuestoes,
-        string $htmlProgresso,
-    ): string {
-        $fontCss = PdfFontes::diretorioInter() !== null ? PdfFontes::css('inter') : PdfFontes::css('dejavu');
-        $pieCss = $this->cssChartPie();
-        $css = RelatorioConsolidadoLayout::css($fontCss, $pieCss, PdfFontes::fontFaceCss('inter'));
+    private function montarDadosRelatorio(array $htmlPorModelo): DadosRelatorioQuinzenal
+    {
+        $xpDes = $this->loadDom($htmlPorModelo['desempenho'] ?? '');
+        $xpAluno = $this->loadDom($htmlPorModelo['aluno'] ?? '');
+        $xpHoras = $this->loadDom($htmlPorModelo['horas-liquidas'] ?? '');
+        $xpQuestoes = $this->loadDom($htmlPorModelo['questoes'] ?? '');
+        $xpProgresso = $this->loadDom($htmlPorModelo['progresso'] ?? '');
 
         [$aluno, $curso] = $this->extrairIdentidadeDesempenho($xpDes);
-        $cards = $this->montarHtmlMetricasDesempenho($xpDes);
+        [$ini, $fim] = $this->datasPeriodoIso();
 
-        $ritmo = RelatorioConsolidadoLayout::grafico(
-            'Horas brutas × horas líquidas',
-            $this->chartImgHtml($htmlHoras, 'chart_line_comparativo', null)
-        ).RelatorioConsolidadoLayout::grafico(
-            RelatorioConsolidadoLayout::TITULO_GRAFICO_PLANEJADAS,
-            $this->chartImgHtml($htmlProgresso, 'chart_horas_diarias', null),
-            RelatorioConsolidadoLayout::LEGENDA_HORAS_ESTUDADAS
-        );
+        $planejadas = $this->seriesDoGrafico($htmlPorModelo['progresso'] ?? '', 'chart_horas_diarias', ['planejad'], true);
+        $comparativo = $this->seriesDoGrafico($htmlPorModelo['horas-liquidas'] ?? '', 'chart_line_comparativo', ['bruta'], true);
+        $questoesDia = $this->seriesDoGrafico($htmlPorModelo['questoes'] ?? '', 'chart_questoes_dia', ['acerto'], false);
 
-        $insights = $this->montarHtmlInsights($xpProgresso);
-
-        $descQuestoes = $this->xpathText($xpQuestoes, "//h2[contains(@class,'section-1')]/following-sibling::p[1]");
-        $questoes = $this->montarHtmlPanorama($xpQuestoes)
-            .RelatorioConsolidadoLayout::grafico('', $this->chartImgHtml($htmlQuestoes, 'chart_questoes_dia', null));
-
-        $descAssuntos = $this->xpathText($xpQuestoes, "//h2[contains(@class,'section-4')]/following-sibling::p[1]");
-        $assuntos = $this->montarHtmlAssuntos($xpQuestoes);
-
-        $descRevisoes = $this->xpathText($xpAluno, "//h2[contains(@class,'section-4')]/following-sibling::p[1]");
-        $revisoesLinhas = $this->contarLinhasTabela($xpAluno, 'tabela_revisoes');
-        $revisoes = $this->htmlTabelaPorId($xpAluno, 'tabela_revisoes');
-        if ($revisoes !== '' && $revisoesLinhas === 0) {
-            $revisoes .= '<p class="empty">Nenhuma revisão registrada neste período.</p>';
+        $assuntos = [];
+        $tabAssuntos = $this->extrairTabelaPorId($xpQuestoes, 'tabela_questoes');
+        foreach ($tabAssuntos['rows'] ?? [] as $linha) {
+            if (count($linha) < 2) {
+                continue;
+            }
+            $assuntos[] = [
+                'disciplina' => (string) ($linha[0] ?? ''),
+                'assunto' => (string) (count($linha) >= 3 ? $linha[1] : ''),
+                'taxa' => (string) end($linha),
+            ];
         }
 
-        $historico = $this->htmlTabelaPorId($xpHoras, 'tabela_horas_liquidas');
+        $tabRevisoes = $this->extrairTabelaPorId($xpAluno, 'tabela_revisoes');
 
-        $secoes = RelatorioConsolidadoLayout::alunoNome($aluno)
-            .RelatorioConsolidadoLayout::secao('Seu desempenho', $curso, $cards, 'mn-sec-keep')
-            .RelatorioConsolidadoLayout::secao('Ritmo de estudos', '', $ritmo)
-            .RelatorioConsolidadoLayout::secao('Painel de Insights', '', $insights, 'mn-sec-insights')
-            .RelatorioConsolidadoLayout::secao('Desempenho em questões', $descQuestoes, $questoes)
-            .RelatorioConsolidadoLayout::secao('Performance por assunto', $descAssuntos, $assuntos, 'mn-sec-table')
-            .RelatorioConsolidadoLayout::secao('Revisões no período', $descRevisoes, $revisoes, 'mn-sec-table')
-            .RelatorioConsolidadoLayout::secao(
-                'Histórico completo',
-                RelatorioConsolidadoLayout::INTRO_HISTORICO,
-                $historico,
-                'mn-sec-table'
+        $historico = [];
+        $tabHistorico = $this->extrairTabelaPorId($xpHoras, 'tabela_horas_liquidas');
+        if ($tabHistorico !== null) {
+            $idx = $this->indicesHistorico($tabHistorico['headers']);
+            foreach ($tabHistorico['rows'] as $linha) {
+                $horas = (string) ($linha[$idx['horas']] ?? '');
+                if ($horas === '' && count($linha) < 2) {
+                    continue;
+                }
+                $historico[] = [
+                    'disciplina' => (string) ($linha[$idx['disciplina']] ?? ''),
+                    'assunto' => (string) ($linha[$idx['assunto']] ?? ''),
+                    'modalidade' => (string) ($linha[$idx['modalidade']] ?? ''),
+                    'horas' => $horas,
+                ];
+            }
+        }
+
+        return new DadosRelatorioQuinzenal(
+            aluno: $aluno,
+            curso: $curso,
+            inicio: new \DateTimeImmutable($ini),
+            fim: new \DateTimeImmutable($fim),
+            datas: $this->datasCompactasDoPeriodo(),
+            planejado: $planejadas['a'],
+            estudado: $planejadas['b'],
+            brutas: $comparativo['a'],
+            liquidas: $comparativo['b'],
+            acertosDia: $questoesDia['a'],
+            errosDia: $questoesDia['b'],
+            acumulado: $this->paresMetricasDesempenho($xpDes),
+            insights: RelatorioConsolidadoLayout::paresInsight($this->textosInsights($xpProgresso)),
+            panorama: $this->paresPanorama($xpQuestoes),
+            assuntos: $assuntos,
+            revisoes: [
+                'headers' => $tabRevisoes['headers'] ?? [],
+                'rows' => $tabRevisoes['rows'] ?? [],
+            ],
+            historico: $historico,
+        );
+    }
+
+    /**
+     * Duas séries de um gráfico de barras agrupadas da Tutory, alinhadas às datas do período.
+     * A série "a" é a que tem uma das palavras em $chavesA no rótulo; a outra é a "b".
+     *
+     * @param  list<string>  $chavesA
+     * @return array{a: list<?float>, b: list<?float>}
+     */
+    private function seriesDoGrafico(string $html, string $canvasId, array $chavesA, bool $horas): array
+    {
+        $vazio = ['a' => [], 'b' => []];
+        if ($html === '') {
+            return $vazio;
+        }
+        $cfg = $this->extrairChartConfig($html, $canvasId);
+        $datasets = is_array($cfg['data']['datasets'] ?? null) ? $cfg['data']['datasets'] : [];
+        if ($datasets === []) {
+            return $vazio;
+        }
+
+        $a = null;
+        $b = null;
+        foreach ($datasets as $i => $ds) {
+            if (! is_array($ds)) {
+                continue;
+            }
+            $rotulo = $this->normalizarParaComparacao((string) ($ds['label'] ?? ''));
+            $ehA = false;
+            foreach ($chavesA as $chave) {
+                if (str_contains($rotulo, $chave)) {
+                    $ehA = true;
+                }
+            }
+            $serie = array_map(
+                static fn ($v): ?float => is_numeric($v) ? (float) $v : null,
+                array_values(is_array($ds['data'] ?? null) ? $ds['data'] : [])
             );
+            if ($ehA && $a === null) {
+                $a = $serie;
+            } elseif ($b === null) {
+                $b = $serie;
+            }
+        }
+        $a ??= [];
+        $b ??= [];
 
-        return '<!DOCTYPE html><html><head><meta charset="utf-8"><style>'.$css
-            .'</style></head><body>'.$secoes.'</body></html>';
+        if ($horas) {
+            $a = $this->paraHorasDecimais($a);
+            $b = $this->paraHorasDecimais($b);
+        }
+
+        return ['a' => $a, 'b' => $b];
+    }
+
+    /**
+     * A Tutory manda horas decimais; se vier em minutos ou segundos, converte.
+     *
+     * @param  list<?float>  $serie
+     * @return list<?float>
+     */
+    private function paraHorasDecimais(array $serie): array
+    {
+        $max = 0.0;
+        foreach ($serie as $v) {
+            $max = max($max, (float) $v);
+        }
+        $divisor = $max > 1000 ? 3600.0 : ($max > 24 ? 60.0 : 1.0);
+        if ($divisor === 1.0) {
+            return $serie;
+        }
+
+        return array_map(static fn (?float $v): ?float => $v === null ? null : $v / $divisor, $serie);
+    }
+
+    /**
+     * @param  list<string>  $headers
+     * @return array{disciplina: int, assunto: int, modalidade: int, horas: int}
+     */
+    private function indicesHistorico(array $headers): array
+    {
+        $idx = ['disciplina' => 0, 'assunto' => 1, 'modalidade' => 2, 'horas' => 3];
+        foreach ($headers as $i => $h) {
+            $n = $this->normalizarParaComparacao($h);
+            if (str_contains($n, 'disciplina')) {
+                $idx['disciplina'] = $i;
+            } elseif (str_contains($n, 'assunto')) {
+                $idx['assunto'] = $i;
+            } elseif (str_contains($n, 'modalidade')) {
+                $idx['modalidade'] = $i;
+            } elseif (str_contains($n, 'hora') || str_contains($n, 'tempo')) {
+                $idx['horas'] = $i;
+            }
+        }
+
+        return $idx;
+    }
+
+    /**
+     * @return list<array{label: string, value: string}>
+     */
+    private function paresMetricasDesempenho(DOMXPath $xp): array
+    {
+        $cards = $xp->query("//*[contains(concat(' ', normalize-space(@class), ' '), ' metric-card ')]");
+        if ($cards === false) {
+            return [];
+        }
+        $items = [];
+        foreach ($cards as $card) {
+            if (! $card instanceof DOMElement) {
+                continue;
+            }
+            $label = '';
+            $value = '';
+            foreach ($card->getElementsByTagName('p') as $p) {
+                $class = ' '.$p->getAttribute('class').' ';
+                $txt = trim((string) $p->textContent);
+                if (str_contains($class, ' metric-label ')) {
+                    $label = $txt;
+                }
+                if (str_contains($class, ' metric-value ')) {
+                    $value = $txt;
+                }
+            }
+            if ($label !== '' || $value !== '') {
+                $items[] = ['label' => $label, 'value' => $value];
+            }
+        }
+
+        return $items;
+    }
+
+    /**
+     * @return list<array{label: string, value: string}>
+     */
+    private function paresPanorama(DOMXPath $xp): array
+    {
+        $nodes = $xp->query("//*[contains(concat(' ', normalize-space(@class), ' '), ' main-numbers ')]");
+        if ($nodes === false) {
+            return [];
+        }
+        $items = [];
+        foreach ($nodes as $node) {
+            if (! $node instanceof DOMElement) {
+                continue;
+            }
+            $label = '';
+            $value = '';
+            foreach ($node->childNodes as $child) {
+                if (! $child instanceof DOMElement) {
+                    continue;
+                }
+                $tag = strtolower($child->tagName);
+                if ($tag === 'p') {
+                    $label = trim((string) $child->textContent);
+                }
+                if ($tag === 'h3') {
+                    $value = trim((string) $child->textContent);
+                }
+            }
+            if ($label !== '' || $value !== '') {
+                $items[] = ['label' => $label, 'value' => $value];
+            }
+        }
+
+        return $items;
     }
 
     /**
@@ -1321,52 +1475,6 @@ class CoachReportDownloader
 
         return RelatorioConsolidadoLayout::alunoNome($aluno)
             .($curso !== '' ? '<p class="mn-aluno-curso">'.htmlspecialchars($curso, ENT_QUOTES, 'UTF-8').'</p>' : '');
-    }
-
-    private function montarHtmlMetricasDesempenho(DOMXPath $xp): string
-    {
-        $cards = $xp->query("//*[contains(concat(' ', normalize-space(@class), ' '), ' metric-card ')]");
-        if ($cards === false || $cards->length === 0) {
-            return '';
-        }
-        $items = [];
-        foreach ($cards as $card) {
-            if (! $card instanceof DOMElement) {
-                continue;
-            }
-            $label = '';
-            $value = '';
-            foreach ($card->getElementsByTagName('p') as $p) {
-                $class = ' '.$p->getAttribute('class').' ';
-                $txt = trim((string) $p->textContent);
-                if (str_contains($class, ' metric-label ')) {
-                    $label = $txt;
-                }
-                if (str_contains($class, ' metric-value ')) {
-                    $value = $txt;
-                }
-            }
-            if ($label === '' && $value === '') {
-                continue;
-            }
-            $items[] = ['label' => $label, 'value' => $value];
-        }
-
-        return RelatorioConsolidadoLayout::cards($items);
-    }
-
-    private function htmlTabelaPorId(DOMXPath $xp, string $id): string
-    {
-        $parsed = $this->extrairTabelaPorId($xp, $id);
-        if ($parsed === null) {
-            return '';
-        }
-
-        return RelatorioConsolidadoLayout::tabela(
-            $parsed['headers'],
-            $parsed['rows'],
-            ['numeric' => $parsed['numeric']]
-        );
     }
 
     /**
@@ -1475,13 +1583,6 @@ class CoachReportDownloader
         }
 
         return $out;
-    }
-
-    private function contarLinhasTabela(DOMXPath $xp, string $id): int
-    {
-        $rows = $xp->query('//*[@id="'.$id.'"]//tbody/tr');
-
-        return $rows === false ? 0 : $rows->length;
     }
 
     private function caminhoDestinoPdf(string $nomeAluno, string $model = 'questoes', ?string $id = null): string
@@ -1659,7 +1760,7 @@ class CoachReportDownloader
         $query = Aluno::query()->orderBy('nome');
         $alunos = $query->get();
         if ($this->teste) {
-            $alvo = mb_strtolower(self::ALUNA_TESTE);
+            $alvo = mb_strtolower(self::ALUNO_TESTE);
             $alunos = $alunos
                 ->filter(static fn (Aluno $a) => str_contains(mb_strtolower($a->nome), $alvo))
                 ->values();
@@ -2336,24 +2437,36 @@ HTML;
      */
     private function montarHtmlInsights(DOMXPath $xp): string
     {
+        $paragrafos = $this->textosInsights($xp);
+        if ($paragrafos === []) {
+            return '';
+        }
+
+        return RelatorioConsolidadoLayout::insights($paragrafos);
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function textosInsights(DOMXPath $xp): array
+    {
         $nodes = $xp->query("//*[contains(concat(' ', normalize-space(@class), ' '), ' insights-panel ')]//p");
         if ($nodes === false || $nodes->length === 0) {
             $nodes = $xp->query("//h2[contains(.,'Motiv')]/following-sibling::p[position()<=8]");
         }
         if ($nodes === false || $nodes->length === 0) {
-            return '';
+            return [];
         }
 
         $paragrafos = [];
         foreach ($nodes as $node) {
             $txt = trim(preg_replace('/\s+/u', ' ', (string) $node->textContent) ?? '');
-            if ($txt === '') {
-                continue;
+            if ($txt !== '') {
+                $paragrafos[] = $txt;
             }
-            $paragrafos[] = $txt;
         }
 
-        return RelatorioConsolidadoLayout::insights($paragrafos);
+        return $paragrafos;
     }
 
     private function montarHtmlMotivacaoProgresso(DOMXPath $xp): string
@@ -3640,7 +3753,7 @@ HTML;
 
         $alunos = $this->semAlunosNovatos($this->coletarAlunosAtivos());
         if ($this->teste) {
-            $alvo = mb_strtolower(self::ALUNA_TESTE);
+            $alvo = mb_strtolower(self::ALUNO_TESTE);
             $alunos = array_values(array_filter(
                 $alunos,
                 static fn (array $a) => str_contains(mb_strtolower($a['nome']), $alvo)
@@ -3648,7 +3761,7 @@ HTML;
             if ($alunos !== []) {
                 $this->log('Modo --teste: '.$alunos[0]['nome'].' (id '.$alunos[0]['id'].')');
             } else {
-                $this->log("Modo --teste: '".self::ALUNA_TESTE."' não encontrada.");
+                $this->log("Modo --teste: '".self::ALUNO_TESTE."' não encontrado.");
             }
         }
 

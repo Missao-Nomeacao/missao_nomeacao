@@ -40,14 +40,16 @@ final class RelatorioPdfCapas
 
     /**
      * Transforma o PDF do relatório em: capa + relatório + capa final.
+     *
+     * $capaPath troca a capa fixa por outra (a capa com o nome do aluno).
      */
-    public static function aplicar(string $pdfPath): void
+    public static function aplicar(string $pdfPath, ?string $capaPath = null): void
     {
         if (! is_file($pdfPath) || filesize($pdfPath) < 500) {
             throw new RuntimeException('PDF do relatório ausente ou vazio para anexar as capas.');
         }
 
-        $capa = self::caminhoCapa();
+        $capa = $capaPath !== null && is_file($capaPath) ? $capaPath : self::caminhoCapa();
         $capaFinal = self::caminhoCapaFinal();
         foreach ([$capa, $capaFinal] as $arquivo) {
             if (! is_file($arquivo) || filesize($arquivo) < 500) {

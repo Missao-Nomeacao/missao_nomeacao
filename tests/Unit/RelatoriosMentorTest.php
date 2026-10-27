@@ -5,6 +5,7 @@ namespace Tests\Unit;
 use App\Services\Tutory\CoachReportDownloader;
 use App\Services\Tutory\RelatorioConsolidadoLayout;
 use App\Services\Tutory\RelatorioPdfCapas;
+use App\Services\Tutory\RelatorioQuinzenalPdf;
 use ReflectionClass;
 use Tests\TestCase;
 
@@ -243,8 +244,9 @@ class RelatoriosMentorTest extends TestCase
         $php = (string) file_get_contents((new ReflectionClass(CoachReportDownloader::class))->getFileName());
         $this->assertStringNotContainsString('aplicarMarcaDaguaPdf', $php);
         $this->assertStringContainsString('use Illuminate\\Support\\Facades\\Http;', $php);
-        $this->assertStringContainsString('aplicarCabecalhoRodape', $php);
-        $this->assertStringContainsString('RelatorioPdfCapas::aplicar', $php);
+        $this->assertStringContainsString('RelatorioQuinzenalPdf::gerar', $php);
+        $pdf = (string) file_get_contents((new ReflectionClass(RelatorioQuinzenalPdf::class))->getFileName());
+        $this->assertStringContainsString('RelatorioPdfCapas::aplicar', $pdf);
         $this->assertSame('AGOSTO - PERÍODO 1', RelatorioConsolidadoLayout::rotuloPeriodo('1', new \DateTimeImmutable('2026-08-10')));
         $this->assertSame('AGOSTO - PERÍODO 2', RelatorioConsolidadoLayout::rotuloPeriodo('2', new \DateTimeImmutable('2026-08-20')));
         $this->assertSame('MISSÃO NOMEAÇÃO', RelatorioConsolidadoLayout::textoCabecalhoEsquerdo());
@@ -305,12 +307,14 @@ class RelatoriosMentorTest extends TestCase
         $this->assertStringNotContainsString('Horas de estudo', $php);
         $this->assertStringNotContainsString('chartDesempenhoHorasEstudo', $php);
         $this->assertStringNotContainsString('chartDesempenhoPerformance', $php);
-        $this->assertStringContainsString('Revisões no período', $php);
-        $this->assertStringContainsString('montarHtmlMetricasDesempenho', $php);
-        $this->assertStringContainsString('Ritmo de estudos', $php);
-        $this->assertStringContainsString('Histórico completo', $php);
-        $this->assertStringContainsString('INTRO_HISTORICO', $php);
-        $this->assertStringContainsString('TITULO_GRAFICO_PLANEJADAS', $php);
+        $this->assertStringContainsString('paresMetricasDesempenho', $php);
+        $this->assertStringContainsString('chart_horas_diarias', $php);
+        $this->assertStringContainsString('chart_line_comparativo', $php);
+        $this->assertStringContainsString('chart_questoes_dia', $php);
+        $pdf = (string) file_get_contents((new ReflectionClass(RelatorioQuinzenalPdf::class))->getFileName());
+        $this->assertStringContainsString('Revisões no período', $pdf);
+        $this->assertStringContainsString('Ritmo de estudos', $pdf);
+        $this->assertStringContainsString('Histórico completo', $pdf);
         $this->assertStringNotContainsString('Horas planejadas × horas (brutas) estudadas', $php);
         $this->assertStringNotContainsString("' (brutas)'", $php);
     }
@@ -509,39 +513,32 @@ class RelatoriosMentorTest extends TestCase
             $pdftotext = trim((string) shell_exec('command -v pdftotext 2>/dev/null'));
             if ($pdftotext !== '') {
                 $txt = (string) shell_exec(escapeshellcmd($pdftotext).' '.escapeshellarg($destino).' -');
-                $this->assertStringContainsString('MISSÃO', $txt);
-                $this->assertStringContainsString('NOMEAÇÃO', $txt);
-                $this->assertStringContainsString('GIOVANNA', $txt);
+                $this->assertStringContainsString('Giovanna', $txt);
+                $this->assertStringContainsString('Curso X', $txt);
+                $this->assertStringContainsString('DESEMPENHO', $txt);
+                $this->assertStringContainsString('Missão Nomeação', $txt);
                 $this->assertStringContainsStringIgnoringCase('Total de', $txt);
-                $this->assertStringContainsStringIgnoringCase('Horas', $txt);
                 $this->assertStringContainsString('10h', $txt);
                 $this->assertStringContainsString('80%', $txt);
-                $this->assertStringContainsString('Seu desempenho', $txt);
-                $this->assertStringContainsString('Painel de Insights', $txt);
-                $this->assertStringContainsString('Desempenho em questões', $txt);
-                $this->assertStringContainsString('Performance por assunto', $txt);
+                $this->assertStringContainsString('02:00', $txt);
+                $this->assertStringContainsStringIgnoringCase('Resumo da quinzena', $txt);
+                $this->assertStringContainsString('Como foram os seus 15 dias', $txt);
+                $this->assertStringContainsStringIgnoringCase('Performance por assunto', $txt);
+                $this->assertStringContainsString('Sintaxe', $txt);
                 $this->assertStringContainsString('Revisões no período', $txt);
-                $this->assertStringContainsString('Histórico completo', $txt);
-                $this->assertStringContainsString('Confira o histórico completo de horas cronometradas no período.', $txt);
+                $this->assertStringContainsString('Nenhuma revisão registrada nesta quinzena', $txt);
                 $this->assertStringNotContainsString('Histórico de Metas', $txt);
                 $this->assertStringNotContainsString('Performance por Área', $txt);
                 $this->assertStringNotContainsString('Horas de estudo', $txt);
                 $this->assertStringNotContainsString('Breve Panorama', $txt);
-                $posNome = mb_strpos($txt, 'GIOVANNA');
-                $posDes = mb_strpos($txt, 'Seu desempenho');
-                $posInsights = mb_strpos($txt, 'Painel de Insights');
-                $posQuestoes = mb_strpos($txt, 'Desempenho em questões');
-                $posAssuntos = mb_strpos($txt, 'Performance por assunto');
+                $posNome = mb_strpos($txt, 'Giovanna');
+                $posResumo = mb_stripos($txt, 'Resumo da quinzena');
+                $posAssuntos = mb_stripos($txt, 'Performance por assunto');
                 $posRevisoes = mb_strpos($txt, 'Revisões no período');
-                $posHist = mb_strpos($txt, 'Histórico completo');
                 $this->assertNotFalse($posNome);
-                $this->assertNotFalse($posDes);
-                $this->assertGreaterThan($posNome, $posDes);
-                $this->assertGreaterThan($posDes, $posInsights);
-                $this->assertGreaterThan($posInsights, $posQuestoes);
-                $this->assertGreaterThan($posQuestoes, $posAssuntos);
+                $this->assertGreaterThan($posNome, $posResumo);
+                $this->assertGreaterThan($posResumo, $posAssuntos);
                 $this->assertGreaterThan($posAssuntos, $posRevisoes);
-                $this->assertGreaterThan($posRevisoes, $posHist);
             }
         } finally {
             foreach (scandir($pasta) ?: [] as $arquivo) {

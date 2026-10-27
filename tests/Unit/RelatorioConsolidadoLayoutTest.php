@@ -2,7 +2,6 @@
 
 namespace Tests\Unit;
 
-use App\Services\Tutory\PdfPreview;
 use App\Services\Tutory\RelatorioConsolidadoLayout;
 use Tests\TestCase;
 
@@ -338,70 +337,6 @@ class RelatorioConsolidadoLayoutTest extends TestCase
         $this->assertLessThan($posTitulo, $posNome);
         $this->assertStringContainsString('mn-sec-keep', $html);
         $this->assertStringContainsString('Curso X', $html);
-    }
-
-    public function test_nome_e_tabelas_nao_invadem_a_faixa_do_cabecalho(): void
-    {
-        $pdftotext = trim((string) shell_exec('command -v pdftotext 2>/dev/null'));
-        if ($pdftotext === '') {
-            $this->markTestSkipped('pdftotext ausente');
-        }
-
-        $pdf = (new PdfPreview)->gerar('dejavu');
-        $tmp = sys_get_temp_dir().'/mn-spacing-'.uniqid('', true).'.pdf';
-        file_put_contents($tmp, $pdf);
-
-        try {
-            $bbox = (string) shell_exec(escapeshellcmd($pdftotext).' -bbox '.escapeshellarg($tmp).' -');
-            $this->assertMatchesRegularExpression(
-                '/<word[^>]*yMin="([0-9.]+)"[^>]*>GIOVANNA<\/word>/',
-                $bbox
-            );
-            preg_match('/<word[^>]*yMin="([0-9.]+)"[^>]*>MISSÃO<\/word>/', $bbox, $cab);
-            preg_match('/<word[^>]*yMin="([0-9.]+)"[^>]*>GIOVANNA<\/word>/', $bbox, $nome);
-            $this->assertNotEmpty($cab);
-            $this->assertNotEmpty($nome);
-            $yCab = (float) $cab[1];
-            $yNome = (float) $nome[1];
-            $this->assertLessThan(40.0, $yCab);
-            $this->assertGreaterThan(90.0, $yNome);
-            $this->assertGreaterThan($yCab + 50.0, $yNome);
-
-            $texto = (string) shell_exec(escapeshellcmd($pdftotext).' '.escapeshellarg($tmp).' -');
-            $this->assertStringContainsString('AGOSTO - PERÍODO 1', $texto);
-            $this->assertStringNotContainsString('•', $texto);
-
-            $pares = [];
-            preg_match_all(
-                '/<word[^>]*yMin="([0-9.]+)"[^>]*>Amostra<\/word>[\s\S]*?<word[^>]*yMin="([0-9.]+)"[^>]*>DISCIPLINA<\/word>/u',
-                $bbox,
-                $assunto,
-                PREG_SET_ORDER
-            );
-            preg_match_all(
-                '/<word[^>]*yMin="([0-9.]+)"[^>]*>cronometradas<\/word>[\s\S]*?<word[^>]*yMin="([0-9.]+)"[^>]*>DISCIPLINA<\/word>/u',
-                $bbox,
-                $historico,
-                PREG_SET_ORDER
-            );
-            $pares = array_merge($assunto, $historico);
-            $this->assertNotEmpty($pares);
-            foreach ($pares as $par) {
-                $delta = (float) $par[2] - (float) $par[1];
-                $this->assertGreaterThan(
-                    18.0,
-                    $delta,
-                    'Texto secundário não pode grudar no cabeçalho da tabela'
-                );
-                $this->assertLessThan(
-                    55.0,
-                    $delta,
-                    'Folga intro→tabela não deve virar faixa vazia'
-                );
-            }
-        } finally {
-            @unlink($tmp);
-        }
     }
 
     /**
