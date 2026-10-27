@@ -171,6 +171,63 @@ class RelatorioQuinzenalPdfTest extends TestCase
         }
     }
 
+    public function test_rotulos_reais_da_tutory_sao_reconhecidos(): void
+    {
+        $html = '<canvas id="chart_questoes_dia"></canvas><script>
+            var elQ = document.getElementById("chart_questoes_dia");
+            new Chart(elQ, {type: "bar", data: {labels: ["04/10/2026", "05/10/2026"], datasets: [
+                {label: "questões corretas", data: [19, 37]},
+                {label: "questões erradas", data: [6, 11]}
+            ]}});
+        </script>';
+        $downloader = new CoachReportDownloader('1', static function (): void {}, false, new \DateTimeImmutable('2026-10-20'));
+        $ref = new ReflectionClass($downloader);
+        $series = $ref->getMethod('seriesDoGrafico')->invoke(
+            $downloader, $html, 'chart_questoes_dia', ['corret', 'acert', 'cert'], ['errad', 'erro', 'incorret'], false
+        );
+        $this->assertSame([19.0, 37.0], array_slice($series['a'], 3, 2));
+        $this->assertSame([6.0, 11.0], array_slice($series['b'], 3, 2));
+
+        $incorretas = str_replace(['questões corretas', 'questões erradas'], ['incorretas', 'corretas'], $html);
+        $invertido = $ref->getMethod('seriesDoGrafico')->invoke(
+            $downloader, $incorretas, 'chart_questoes_dia', ['corret', 'acert', 'cert'], ['errad', 'erro', 'incorret'], false
+        );
+        $this->assertSame([6.0, 11.0], array_slice($invertido['a'], 3, 2));
+        $this->assertSame([19.0, 37.0], array_slice($invertido['b'], 3, 2));
+    }
+
+    public function test_textos_reais_da_tutory_no_resumo_e_na_capa(): void
+    {
+        $d = new DadosRelatorioQuinzenal(
+            'Mychel', 'Curso: CFP - PMSC', new \DateTimeImmutable('2026-10-01'), new \DateTimeImmutable('2026-10-15'),
+            insights: [
+                ['label' => 'SUA MÉDIA DE TEMPO POR DIA FOI DE', 'value' => '02:08'],
+                ['label' => 'MATÉRIA MAIS ESTUDADA', 'value' => 'PORTUGUÊS'],
+                ['label' => 'MATÉRIA MENOS ESTUDADA', 'value' => 'LEGISLAÇÃO DE TRÂNSITO'],
+            ],
+        );
+        $this->assertSame('02:08', $d->mediaDiaria());
+        $this->assertSame('CFP - PMSC', $d->cursoLimpo());
+        $this->assertSame('Legislação de Trânsito', $d->nomeDisciplina('LEGISLAÇÃO DE TRÂNSITO'));
+        $this->assertSame('Direito Penal Militar', $d->nomeDisciplina('DIREITO PENAL MILITAR'));
+        $this->assertSame('Português', $d->nomeDisciplina('Português'));
+
+        $miolo = RelatorioQuinzenalPdf::htmlMiolo($d);
+        $this->assertStringContainsString('Média por dia', $miolo);
+        $this->assertStringContainsString('Legislação de Trânsito', $miolo);
+        $capa = RelatorioQuinzenalPdf::htmlCapa($d);
+        $this->assertStringContainsString('Curso <b>CFP - PMSC</b>', $capa);
+        $this->assertStringContainsString('1 a 15 de outubro', $capa);
+    }
+
+    public function test_legenda_dos_graficos_sai_em_celulas_separadas(): void
+    {
+        $html = RelatorioQuinzenalPdf::htmlMiolo(PdfPreview::dadosDeExemplo());
+        $this->assertStringContainsString('<td class="nome">Acertos</td>', $html);
+        $this->assertStringContainsString('<td class="nome fim">Erros</td>', $html);
+        $this->assertStringNotContainsString('<span><i class="sw', $html);
+    }
+
     public function test_dados_saem_dos_graficos_e_tabelas_da_tutory(): void
     {
         $graficoPlanejado = '<canvas id="chart_horas_diarias"></canvas><script>

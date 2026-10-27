@@ -13,13 +13,13 @@ Ordem fixa do PDF final:
 1. **Capa** — gerada pelo Dompdf para cada aluno: fundo `resources/relatorios/capa-fundo.jpg`, logo `logo-amarelo.png`, "Relatório de Desempenho", nome do aluno, curso e período por extenso ("16 a 30 de setembro"). Se a capa falhar, entra a fixa `capa.pdf`.
 2. **Resumo da quinzena** — "Como foram os seus N dias": cards *Média por dia* (Painel de Insights, em destaque), *Plano cumprido* (soma do estudado ÷ soma do planejado, de `#chart_horas_diarias`), *Questões* e *Acertos* (panorama `.main-numbers`); faixa com os cards de desempenho geral (`.metric-card`), com barra quando o card é de progresso em %; matéria mais e menos estudada, com as horas do período tiradas do histórico.
 3. **Ritmo de estudos** — "Horas por dia" (barra do estudado; traço dourado = meta do dia; barra clara = abaixo da meta) de `#chart_horas_diarias` e "Horas brutas × horas líquidas" de `#chart_line_comparativo`.
-4. **Questões** — só os dias com questões (`#chart_questoes_dia`), barra de acertos × erros e o % do dia.
+4. **Questões** — só os dias com questões (`#chart_questoes_dia`, séries "questões corretas" e "questões erradas"), barra de acertos × erros e o % do dia.
 5. **Performance por assunto** — `#tabela_questoes`, com medidor colorido: verde a partir de 80%, âmbar de 70% a 79%, vermelho abaixo de 70%.
 6. **Revisões no período** — `#tabela_revisoes`; sem linhas, vira o aviso "Nenhuma revisão registrada nesta quinzena".
 7. **Histórico completo** — `#tabela_horas_liquidas` agrupado por disciplina (total e barra proporcional), com modalidade em etiqueta colorida.
 8. **Última folha** — PDF fixo `resources/relatorios/capa-final.pdf`.
 
-Quando todas as disciplinas têm o mesmo prefixo do curso ("PMSC - Português"), o prefixo sai na exibição, porque o curso já está na capa.
+Quando todas as disciplinas têm o mesmo prefixo do curso ("PMSC - Português"), o prefixo sai na exibição, porque o curso já está na capa. Nome de disciplina que vem todo em maiúsculas ("LEGISLAÇÃO DE TRÂNSITO") é exibido em caixa de título ("Legislação de Trânsito"). O "Curso:" que a Tutory põe antes do curso sai da capa. A *Média por dia* vem do insight "Sua média de tempo por dia foi de …".
 
 Os gráficos são desenhados com GD (`GraficosRelatorioQuinzenal`), sem QuickChart. A Tutory manda horas decimais; se a série vier em minutos ou segundos, ela é convertida para horas.
 

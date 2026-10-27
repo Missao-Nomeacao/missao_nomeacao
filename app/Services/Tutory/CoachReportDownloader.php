@@ -1228,9 +1228,10 @@ class CoachReportDownloader
         [$aluno, $curso] = $this->extrairIdentidadeDesempenho($xpDes);
         [$ini, $fim] = $this->datasPeriodoIso();
 
-        $planejadas = $this->seriesDoGrafico($htmlPorModelo['progresso'] ?? '', 'chart_horas_diarias', ['planejad'], true);
-        $comparativo = $this->seriesDoGrafico($htmlPorModelo['horas-liquidas'] ?? '', 'chart_line_comparativo', ['bruta'], true);
-        $questoesDia = $this->seriesDoGrafico($htmlPorModelo['questoes'] ?? '', 'chart_questoes_dia', ['acerto'], false);
+        $planejadas = $this->seriesDoGrafico($htmlPorModelo['progresso'] ?? '', 'chart_horas_diarias', ['planejad', 'meta', 'previst'], ['estudad', 'realizad', 'bruta'], true);
+        $comparativo = $this->seriesDoGrafico($htmlPorModelo['horas-liquidas'] ?? '', 'chart_line_comparativo', ['bruta'], ['liquid'], true);
+        // Na Tutory: "questões corretas" e "questões erradas".
+        $questoesDia = $this->seriesDoGrafico($htmlPorModelo['questoes'] ?? '', 'chart_questoes_dia', ['corret', 'acert', 'cert'], ['errad', 'erro', 'incorret'], false);
 
         $assuntos = [];
         $tabAssuntos = $this->extrairTabelaPorId($xpQuestoes, 'tabela_questoes');
@@ -1291,12 +1292,15 @@ class CoachReportDownloader
 
     /**
      * Duas séries de um gráfico de barras agrupadas da Tutory, alinhadas às datas do período.
-     * A série "a" é a que tem uma das palavras em $chavesA no rótulo; a outra é a "b".
+     * A série "b" é a que tem uma das palavras de $chavesB no rótulo (testada antes, porque
+     * "incorretas" contém "corretas"); a "a" é a que tem uma das palavras de $chavesA.
+     * Rótulo desconhecido ocupa a primeira vaga livre, na ordem do gráfico.
      *
      * @param  list<string>  $chavesA
+     * @param  list<string>  $chavesB
      * @return array{a: list<?float>, b: list<?float>}
      */
-    private function seriesDoGrafico(string $html, string $canvasId, array $chavesA, bool $horas): array
+    private function seriesDoGrafico(string $html, string $canvasId, array $chavesA, array $chavesB, bool $horas): array
     {
         $vazio = ['a' => [], 'b' => []];
         if ($html === '') {
@@ -1310,22 +1314,35 @@ class CoachReportDownloader
 
         $a = null;
         $b = null;
-        foreach ($datasets as $i => $ds) {
+        $semRotulo = [];
+        $contem = static function (string $rotulo, array $chaves): bool {
+            foreach ($chaves as $chave) {
+                if (str_contains($rotulo, $chave)) {
+                    return true;
+                }
+            }
+
+            return false;
+        };
+        foreach ($datasets as $ds) {
             if (! is_array($ds)) {
                 continue;
             }
             $rotulo = $this->normalizarParaComparacao((string) ($ds['label'] ?? ''));
-            $ehA = false;
-            foreach ($chavesA as $chave) {
-                if (str_contains($rotulo, $chave)) {
-                    $ehA = true;
-                }
-            }
             $serie = array_map(
                 static fn ($v): ?float => is_numeric($v) ? (float) $v : null,
                 array_values(is_array($ds['data'] ?? null) ? $ds['data'] : [])
             );
-            if ($ehA && $a === null) {
+            if ($b === null && $contem($rotulo, $chavesB)) {
+                $b = $serie;
+            } elseif ($a === null && $contem($rotulo, $chavesA)) {
+                $a = $serie;
+            } else {
+                $semRotulo[] = $serie;
+            }
+        }
+        foreach ($semRotulo as $serie) {
+            if ($a === null) {
                 $a = $serie;
             } elseif ($b === null) {
                 $b = $serie;
