@@ -37,7 +37,7 @@ Opções:
   --periodo=1|2   Obrigatório.
                   1 = Dia inicial: 01 / Dia final: 15
                   2 = Dia inicial: 16 / Dia final: último dia do mês
-  --teste         Baixa só os relatórios da aluna Giovanna
+  --teste         Baixa só os relatórios do aluno Mychel
   --help          Mostra esta ajuda
 
 HELP);

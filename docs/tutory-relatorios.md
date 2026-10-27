@@ -6,19 +6,22 @@ No Hostinger compartilhado **não precisa de Node nem de npm**. O PDF é montado
 
 ## O que entra no PDF único
 
-Não é a junção dos cinco PDFs oficiais. O compositor extrai os dados da Tutory **sem alterá-los** e monta um único produto visual da Missão Nomeação, em seções modulares (a quantidade de páginas é consequência do conteúdo).
+Não é a junção dos cinco PDFs oficiais. O compositor extrai os dados da Tutory **sem alterá-los** (`CoachReportDownloader::montarDadosRelatorio` → `DadosRelatorioQuinzenal`) e o `RelatorioQuinzenalPdf` monta o layout aprovado pela mentora. A quantidade de páginas é consequência do conteúdo; seção sem dado é omitida. Não há cabeçalho nem número de página nas páginas internas.
 
-Ordem fixa do PDF final (capa + relatório + capa final). As páginas internas continuam com a paginação original (`Página X de Y` só no relatório):
+Ordem fixa do PDF final:
 
-1. **Capa** — PDF institucional em `resources/relatorios/capa.pdf` (página inteira, sem cabeçalho/rodapé)
-2. **Seu desempenho** — nome, curso e cards de métricas (`.main-header-card` + `.metrics-grid`)
-3. **Ritmo de estudos** — horas brutas × líquidas (`#chart_line_comparativo`) e horas planejadas × horas (brutas) estudadas (`#chart_horas_diarias`)
-4. **Painel de Insights** — `.insights-panel`, sem título duplicado
-5. **Desempenho em questões** — cards do panorama (`.main-numbers`) e gráfico do período (`#chart_questoes_dia`)
-6. **Performance por assunto** — `#tabela_questoes` (percentual colorido só no indicador)
-7. **Revisões no período** — `#tabela_revisoes`
-8. **Histórico completo** — `#tabela_horas_liquidas`
-9. **Capa final** — PDF institucional em `resources/relatorios/capa-final.pdf` (página inteira, sem cabeçalho/rodapé)
+1. **Capa** — gerada pelo Dompdf para cada aluno: fundo `resources/relatorios/capa-fundo.jpg`, logo `logo-amarelo.png`, "Relatório de Desempenho", nome do aluno, curso e período por extenso ("16 a 30 de setembro"). Se a capa falhar, entra a fixa `capa.pdf`.
+2. **Resumo da quinzena** — "Como foram os seus N dias": cards *Média por dia* (Painel de Insights, em destaque), *Plano cumprido* (soma do estudado ÷ soma do planejado, de `#chart_horas_diarias`), *Questões* e *Acertos* (panorama `.main-numbers`); faixa com os cards de desempenho geral (`.metric-card`), com barra quando o card é de progresso em %; matéria mais e menos estudada, com as horas do período tiradas do histórico.
+3. **Ritmo de estudos** — "Horas por dia" (barra do estudado; traço dourado = meta do dia; barra clara = abaixo da meta) de `#chart_horas_diarias` e "Horas brutas × horas líquidas" de `#chart_line_comparativo`.
+4. **Questões** — só os dias com questões (`#chart_questoes_dia`, séries "questões corretas" e "questões erradas"), barra de acertos × erros e o % do dia.
+5. **Performance por assunto** — `#tabela_questoes`, com medidor colorido: verde a partir de 80%, âmbar de 70% a 79%, vermelho abaixo de 70%.
+6. **Revisões no período** — `#tabela_revisoes`; sem linhas, vira o aviso "Nenhuma revisão registrada nesta quinzena".
+7. **Histórico completo** — `#tabela_horas_liquidas` agrupado por disciplina (total e barra proporcional), com modalidade em etiqueta colorida.
+8. **Última folha** — PDF fixo `resources/relatorios/capa-final.pdf`.
+
+Quando todas as disciplinas têm o mesmo prefixo do curso ("PMSC - Português"), o prefixo sai na exibição, porque o curso já está na capa. Nome de disciplina que vem todo em maiúsculas ("LEGISLAÇÃO DE TRÂNSITO") é exibido em caixa de título ("Legislação de Trânsito"). O "Curso:" que a Tutory põe antes do curso sai da capa. A *Média por dia* vem do insight "Sua média de tempo por dia foi de …".
+
+Os gráficos são desenhados com GD (`GraficosRelatorioQuinzenal`), sem QuickChart. A Tutory manda horas decimais; se a série vier em minutos ou segundos, ela é convertida para horas.
 
 | Origem | Fora do consolidado |
 |--------|---------------------|
@@ -28,7 +31,7 @@ Ordem fixa do PDF final (capa + relatório + capa final). As páginas internas c
 | **Questões** `questoes` | Bolha, top melhores/piores, evolução por matéria |
 | **Progresso do plano** `progresso` | Progresso principal, panorama, modalidades, desempenho de questões |
 
-Performance por assunto aparece só uma vez, na implementação do relatório de Questões. Identidade: azul `#001D3D`, dourado `#BF8F00`, Inter, cabeçalho `MISSÃO NOMEAÇÃO` / `MÊS - PERÍODO N`, rodapé `Página X de Y`. Sem marca d'água diagonal.
+Identidade do relatório quinzenal: azul `#0B1F3F`, dourado `#F2B705`, Montserrat nos títulos e números, Nunito Sans no texto (`resources/fonts/montserrat` e `resources/fonts/nunito-sans`). Sem marca d'água diagonal. O `RelatorioConsolidadoLayout` continua servindo os PDFs individuais e o motor Puppeteer opcional.
 
 ## Fluxo
 
@@ -37,7 +40,7 @@ Performance por assunto aparece só uma vez, na implementação do relatório de
 3. Para **cada modelo** em `RELATORIOS` (mesmo token de geração):
    1. `POST /intent/cadastrar-relatorio-coach` (`alunos[]`, `dt_ini`, `dt_fim`, `agrupamento=dia`)
    2. `GET /documentos/relatorios/{model}?key=...` (HTML oficial; as páginas do Tutory **não são alteradas**)
-4. Monta **um** PDF com **PHP/Dompdf + QuickChart** (padrão no Hostinger; Puppeteer só se `TUTORY_PDF_ENGINE=puppeteer`)
+4. Monta **um** PDF com **PHP/Dompdf** e gráficos em GD (padrão no Hostinger; Puppeteer só se `TUTORY_PDF_ENGINE=puppeteer`)
 5. Reprocessa falhas por aluno (até 3 tentativas)
 6. Lista alunos do **admin** (`alunos`). Quem tem **menos de 15 dias** de cadastro é aluno novato: o PDF não é gerado, as faixas não são gravadas e, se `recebe_email=true`, sai só o e-mail de boas-vindas (texto único em `/admin/boas-vindas`, placeholder `{NOME}`). Os demais: localiza o PDF `relatorio_consolidado_*` → avalia o desempenho e grava as faixas no aluno (`last_performance` = constancy, `last_question_volume`, `last_accuracy_rate`, `last_subjects`) → envia **um único e-mail com 1 anexo** se `recebe_email=true` → **apaga todos os PDFs** da pasta de download (e os `.metricas.json` ao lado). Logs `log_download_*.txt` permanecem. No dashboard, sem contato neste ciclo a ação é Aluno novato (filtro do mesmo nome), à parte das faixas. Contato registrado deixa a ação em Ok e a frase do cadastro fica como observação na ficha; se a data agendada passar sem outro contato, a ação vira Marcar presença.
 7. Ao fim da execução, gera um PDF resumido (alunos, PDFs, envios, alunos novatos e divergências de nome) e envia para `MAIL_RELATORIO_EXECUCAO_ADDRESS` (padrão `luispimenta.contato@gmail.com`), com o mesmo CCO dos outros e-mails. O novato entra na contagem de ativos, na tabela da execução (PDF não gerado, e-mail de boas-vindas) e na conclusão. Ele não conta como falha de geração nem como PDF não localizado. Horário e duração são os do log `log_download_*.txt` (a janela da geração). O arquivo fica em `storage/app/tutory-execucao/`, fora da pasta pública. Uma falha nesse envio não desfaz os relatórios já enviados aos alunos. `--se-pendente`, quando o período já foi enviado, encerra antes dessa etapa e não manda o resumo.
@@ -57,7 +60,7 @@ Log esperado:
 ```
 PDF com PHP/Dompdf — não usa npm/Node. Ignore "npm: command not found".
 Modo: CLI/HTTP → cadastrar-relatorio-coach + 1 PDF consolidado via PHP/Dompdf (TUTORY_PDF_ENGINE=dompdf)
-[Giovanna] TUTORY_PDF_ENGINE=dompdf — gerando o consolidado com PHP/Dompdf
+[Mychel] TUTORY_PDF_ENGINE=dompdf — gerando o consolidado com PHP/Dompdf
 ```
 
 ## Modelos-fonte (`RELATORIOS`)
@@ -77,7 +80,7 @@ Os cinco modelos são os botões de `#modalGeraRelatorio` em Pesquisar Alunos. O
 ## Requisitos
 
 - PHP 8.2+ com `php-gd` (Dompdf)
-- Rede para `admin.tutory.com.br` e `quickchart.io` (gráficos no fallback)
+- Rede para `admin.tutory.com.br` (e `quickchart.io` só para os PDFs individuais)
 - Node.js 18+ com `puppeteer` — **opcional**; só se quiser o compositor fiel ao navegador
 - SMTP configurado (`MAIL_*`) para envio dos relatórios
 - Alunos cadastrados em `/admin/alunos` com o **mesmo nome** usado no Tutory (para casar o PDF)
@@ -106,7 +109,7 @@ Se `PASTA_DOWNLOAD` estiver vazio, usa `public/pdfs`.
 ## Uso
 
 ```bash
-# Regenerar só a Giovanna:
+# Regenerar só o Mychel (modo --teste):
 # período 1 = dias 01–15 do mês corrente
 # período 2 = dia 16 até o último dia do mês (no dia 1–15, usa o mês anterior)
 php artisan tutory:baixar-relatorios --periodo=1 --teste
