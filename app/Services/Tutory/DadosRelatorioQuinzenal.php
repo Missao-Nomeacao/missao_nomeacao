@@ -88,6 +88,85 @@ final class DadosRelatorioQuinzenal
     }
 
     /**
+     * Insight cujo rótulo contém todos os trechos (comparação sem acento e sem espaço).
+     * A Tutory escreve, por exemplo, "Sua média de tempo por dia foi de 02:39".
+     *
+     * @param  list<string>  $trechos
+     */
+    public function insightContendo(array $trechos): ?string
+    {
+        foreach ($this->insights as $par) {
+            $rotulo = self::normalizar($par['label']);
+            $ok = true;
+            foreach ($trechos as $t) {
+                if (! str_contains($rotulo, self::normalizar($t))) {
+                    $ok = false;
+                    break;
+                }
+            }
+            if ($ok && trim($par['value']) !== '') {
+                return $par['value'];
+            }
+        }
+
+        return null;
+    }
+
+    public function mediaDiaria(): ?string
+    {
+        return $this->insightContendo(['média']);
+    }
+
+    /**
+     * Curso como a Tutory manda, sem o rótulo "Curso:" na frente.
+     */
+    public function cursoLimpo(): string
+    {
+        $curso = trim(preg_replace('/\s+/u', ' ', $this->curso) ?? $this->curso);
+
+        return trim(preg_replace('/^curso\s*:\s*/iu', '', $curso) ?? $curso);
+    }
+
+    /**
+     * Nome da disciplina para exibir: sem o prefixo do curso e, se vier todo em
+     * maiúsculas ("LEGISLAÇÃO DE TRÂNSITO"), em caixa de título ("Legislação de Trânsito").
+     */
+    public function nomeDisciplina(string $disciplina): string
+    {
+        return self::caixaDeTitulo($this->semPrefixoCurso(trim($disciplina)));
+    }
+
+    public static function caixaDeTitulo(string $texto): string
+    {
+        if ($texto === '' || mb_strtoupper($texto, 'UTF-8') !== $texto || ! preg_match('/\p{Lu}{2}/u', $texto)) {
+            return $texto;
+        }
+        $minusculas = ['de', 'da', 'do', 'das', 'dos', 'e', 'em', 'a', 'o', 'as', 'os', 'no', 'na', 'nos', 'nas', 'por', 'para', 'com'];
+        $palavras = preg_split('/(\s+)/u', mb_strtolower($texto, 'UTF-8'), -1, PREG_SPLIT_DELIM_CAPTURE) ?: [];
+        $out = '';
+        foreach ($palavras as $i => $p) {
+            if (trim($p) === '') {
+                $out .= $p;
+
+                continue;
+            }
+            if ($i > 0 && in_array($p, $minusculas, true)) {
+                $out .= $p;
+
+                continue;
+            }
+            if (preg_match('/^(i|ii|iii|iv|v|vi|vii|viii|ix|x)$/u', $p)) {
+                $out .= mb_strtoupper($p, 'UTF-8');
+
+                continue;
+            }
+            $out .= mb_strtoupper(mb_substr($p, 0, 1, 'UTF-8'), 'UTF-8').mb_substr($p, 1, null, 'UTF-8');
+        }
+
+        return $out;
+    }
+
+    /**
      * @return array{total: ?int, acertos: ?int, percentual: ?string}
      */
     public function questoes(): array
@@ -163,7 +242,7 @@ final class DadosRelatorioQuinzenal
     {
         $grupos = [];
         foreach ($this->historico as $linha) {
-            $nome = $this->semPrefixoCurso($linha['disciplina']);
+            $nome = $this->nomeDisciplina($linha['disciplina']);
             $seg = self::segundos($linha['horas']);
             $grupos[$nome] ??= ['disciplina' => $nome, 'segundos' => 0, 'itens' => []];
             $grupos[$nome]['segundos'] += $seg;
@@ -185,7 +264,7 @@ final class DadosRelatorioQuinzenal
 
     public function horasDaDisciplina(string $disciplina): ?int
     {
-        $alvo = self::normalizar($this->semPrefixoCurso($disciplina));
+        $alvo = self::normalizar($this->nomeDisciplina($disciplina));
         foreach ($this->historicoPorDisciplina() as $g) {
             if (self::normalizar($g['disciplina']) === $alvo) {
                 return $g['segundos'];

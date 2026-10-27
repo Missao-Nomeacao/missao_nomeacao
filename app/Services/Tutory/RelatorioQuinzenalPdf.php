@@ -156,8 +156,8 @@ final class RelatorioQuinzenalPdf
         $fontes = self::fontes();
         $aluno = self::e(trim($d->aluno));
         $chips = '';
-        if (trim($d->curso) !== '') {
-            $chips .= '<span class="chip">Curso <b>'.self::e(self::cursoCurto($d->curso)).'</b></span>';
+        if ($d->cursoLimpo() !== '') {
+            $chips .= '<span class="chip">Curso <b>'.self::e($d->cursoLimpo()).'</b></span>';
         }
         $chips .= '<span class="chip">Período <b>'.self::e($d->periodoPorExtenso()).'</b></span>';
         $az = self::AZUL;
@@ -220,14 +220,6 @@ HTML;
         imagedestroy($img);
 
         return 'data:image/png;base64,'.base64_encode($bytes);
-    }
-
-    /**
-     * "Curso de Formação de Praças - PMSC" continua igual; só tira espaços sobrando.
-     */
-    private static function cursoCurto(string $curso): string
-    {
-        return trim(preg_replace('/\s+/u', ' ', $curso) ?? $curso);
     }
 
     // ----------------------------------------------------------------- miolo
@@ -302,7 +294,8 @@ h2{font-family:'MN Titulo Bold';font-size:22px;line-height:1.3;margin-top:2px;co
 .ins{background:#ffffff;border:1px solid {$linha};border-radius:14px;padding:14px 16px;}
 .grade td.kpi,.grade td.ins{vertical-align:top;}
 .ins td.ic{width:50px;}
-.dot{width:36px;height:36px;border-radius:10px;text-align:center;font-family:'MN Titulo';font-size:20px;line-height:34px;}
+.dot{width:36px;height:36px;border-radius:10px;}
+.dot td{width:36px;height:36px;padding:0;text-align:center;vertical-align:middle;font-family:'MN Titulo';font-size:18px;line-height:1;}
 .dot.up{background:{$oks};color:{$ok};}
 .dot.down{background:{$ats};color:{$at};}
 .ins .k{font-family:'Nunito';font-weight:bold;font-size:12px;letter-spacing:0.7px;text-transform:uppercase;color:{$sec};}
@@ -311,10 +304,14 @@ h2{font-family:'MN Titulo Bold';font-size:22px;line-height:1.3;margin-top:2px;co
 
 .chart-head{width:100%;margin-bottom:6px;}
 .chart-head h3{font-family:'MN Titulo Bold';font-size:15px;color:{$az};}
-.legenda{text-align:right;font-size:12.5px;color:{$sec};}
-.legenda span{margin-left:14px;white-space:nowrap;}
-.sw{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:6px;}
-.sw.traco{height:3px;border-radius:2px;margin-bottom:3px;}
+.legenda{text-align:right;vertical-align:middle;}
+.leg{margin-left:auto;}
+.leg td{vertical-align:middle;font-size:12.5px;color:{$sec};white-space:nowrap;}
+.leg td.cor{width:12px;padding-right:6px;}
+.leg td.nome{padding-right:16px;}
+.leg td.nome.fim{padding-right:0;}
+.sw{width:12px;height:12px;border-radius:3px;}
+.sw.traco{height:3px;border-radius:2px;}
 
 .qrow{width:100%;margin-top:10px;}
 .qrow:first-child{margin-top:0;}
@@ -347,7 +344,8 @@ h2{font-family:'MN Titulo Bold';font-size:22px;line-height:1.3;margin-top:2px;co
 .vazio{border:1.5px dashed {$linha};border-radius:14px;padding:18px 20px;background:#ffffff;page-break-inside:avoid;}
 .vazio td{vertical-align:middle;}
 .vazio td.ic{width:54px;}
-.vazio .icone{width:40px;height:40px;border-radius:20px;background:{$ouros};color:{$ourot};text-align:center;font-family:'MN Titulo';font-size:18px;line-height:40px;}
+.vazio .icone{width:40px;height:40px;border-radius:20px;background:{$ouros};}
+.vazio .icone td{width:40px;height:40px;padding:0;text-align:center;vertical-align:middle;color:{$ourot};font-family:'MN Titulo';font-size:18px;line-height:1;}
 .vazio b{font-family:'Nunito';font-weight:bold;display:block;}
 .vazio span{color:{$sec};font-size:14px;}
 
@@ -415,7 +413,7 @@ CSS;
     {
         $q = $d->questoes();
         $plano = $d->planoCumprido();
-        $media = $d->insight('MÉDIA DIÁRIA');
+        $media = $d->mediaDiaria();
 
         $kpis = [];
         if ($media !== null) {
@@ -487,10 +485,10 @@ CSS;
     {
         $cards = [];
         foreach ([
-            ['MATÉRIA MAIS ESTUDADA', 'Matéria mais estudada', 'up', '↑', ''],
-            ['MATÉRIA MENOS ESTUDADA', 'Matéria menos estudada', 'down', '↓', ' · merece atenção na próxima quinzena'],
+            [['mais estudada'], 'Matéria mais estudada', 'up', '↑', ''],
+            [['menos estudada'], 'Matéria menos estudada', 'down', '↓', ' · merece atenção na próxima quinzena'],
         ] as [$chave, $rotulo, $classe, $seta, $extra]) {
-            $materia = $d->insight($chave);
+            $materia = $d->insightContendo($chave);
             if ($materia === null || trim($materia) === '') {
                 continue;
             }
@@ -498,8 +496,8 @@ CSS;
             $sub = $seg !== null ? DadosRelatorioQuinzenal::horasCurtas($seg).' no período'.$extra : ltrim($extra, ' ·');
             $cards[] = [
                 'classe' => 'ins',
-                'html' => '<table style="width:100%"><tr><td class="ic"><div class="dot '.$classe.'">'.$seta.'</div></td>'
-                    .'<td><div class="k">'.self::e($rotulo).'</div><div class="v">'.self::e($d->semPrefixoCurso($materia)).'</div>'
+                'html' => '<table style="width:100%"><tr><td class="ic"><table class="dot '.$classe.'"><tr><td>'.$seta.'</td></tr></table></td>'
+                    .'<td><div class="k">'.self::e($rotulo).'</div><div class="v">'.self::e($d->nomeDisciplina($materia)).'</div>'
                     .($sub !== '' ? '<div class="s">'.self::e(mb_strtoupper(mb_substr($sub, 0, 1)).mb_substr($sub, 1)).'</div>' : '')
                     .'</td></tr></table>',
             ];
@@ -551,14 +549,26 @@ CSS;
      */
     private static function painelGrafico(string $titulo, array $legenda, string $img): string
     {
-        $itens = '';
-        foreach ($legenda as [$nome, $cor, $traco]) {
-            $itens .= '<span><i class="sw'.($traco ? ' traco' : '').'" style="background:'.$cor.'"></i>'.self::e($nome).'</span>';
+        return '<div class="panel"><table class="chart-head"><tr><td><h3>'.self::e($titulo).'</h3></td>'
+            .'<td class="legenda">'.self::legenda($legenda).'</td></tr></table>'
+            .'<img src="'.$img.'" alt="" width="'.self::LARGURA_GRAFICO.'" height="'.GraficosRelatorioQuinzenal::alturaPara(self::LARGURA_GRAFICO).'"></div>';
+    }
+
+    /**
+     * Legenda em tabela: o Dompdf ignora margem lateral em elementos de linha.
+     *
+     * @param  list<array{0: string, 1: string, 2: bool}>  $itens
+     */
+    private static function legenda(array $itens): string
+    {
+        $html = '<table class="leg"><tr>';
+        $ultimo = count($itens) - 1;
+        foreach ($itens as $i => [$nome, $cor, $traco]) {
+            $html .= '<td class="cor"><div class="sw'.($traco ? ' traco' : '').'" style="background:'.$cor.'"></div></td>'
+                .'<td class="nome'.($i === $ultimo ? ' fim' : '').'">'.self::e($nome).'</td>';
         }
 
-        return '<div class="panel"><table class="chart-head"><tr><td><h3>'.self::e($titulo).'</h3></td>'
-            .'<td class="legenda">'.$itens.'</td></tr></table>'
-            .'<img src="'.$img.'" alt="" width="'.self::LARGURA_GRAFICO.'" height="'.GraficosRelatorioQuinzenal::alturaPara(self::LARGURA_GRAFICO).'"></div>';
+        return $html.'</tr></table>';
     }
 
     // ------------------------------------------------------------ 3. questões
@@ -599,8 +609,7 @@ CSS;
                 .'<td class="p '.self::classeFaixa($pct).'" style="width:64px">'.self::e(DadosRelatorioQuinzenal::numeroBr($pct, 1)).'%</td></tr></table>';
         }
 
-        $legenda = '<span><i class="sw" style="background:'.self::AZUL.'"></i>Acertos</span>'
-            .'<span><i class="sw" style="background:'.self::DOURADO.'"></i>Erros</span>';
+        $legenda = self::legenda([['Acertos', self::AZUL, false], ['Erros', self::DOURADO, false]]);
         $html .= '<div class="panel"><table class="chart-head"><tr><td><h3>Dias com questões</h3></td>'
             .'<td class="legenda">'.$legenda.'</td></tr></table>'.$linhas.'</div>';
 
@@ -621,7 +630,7 @@ CSS;
             $pct = DadosRelatorioQuinzenal::percentual($a['taxa']);
             $faixa = self::classeFaixa($pct);
             $titulo = trim($a['assunto']) !== '' ? $a['assunto'] : $a['disciplina'];
-            $sub = trim($a['assunto']) !== '' ? '<div class="dsc">'.self::e($d->semPrefixoCurso($a['disciplina'])).'</div>' : '';
+            $sub = trim($a['assunto']) !== '' ? '<div class="dsc">'.self::e($d->nomeDisciplina($a['disciplina'])).'</div>' : '';
             $medidor = $pct !== null
                 ? '<div class="medidor"><div class="bg-'.$faixa.'" style="width:'.max(0, min(100, $pct)).'%"></div></div>'
                 : '';
@@ -645,7 +654,7 @@ CSS;
         $html = self::cabecalho('Revisões', 'Revisões no período');
         $rows = $d->revisoes['rows'];
         if ($rows === []) {
-            $html .= '<div class="vazio"><table style="width:100%"><tr><td class="ic"><div class="icone">!</div></td>'
+            $html .= '<div class="vazio"><table style="width:100%"><tr><td class="ic"><table class="icone"><tr><td>!</td></tr></table></td>'
                 .'<td><b>Nenhuma revisão registrada nesta quinzena</b>'
                 .'<span>Revisar é o que fixa o conteúdo. Reserve um horário fixo na semana para isso.</span></td></tr></table></div>';
 
@@ -660,7 +669,7 @@ CSS;
             $qtd = count($r) >= 3 ? (string) end($r) : '';
             $linhas .= '<table class="topico'.($i === $ultimo ? ' ultimo' : '').'"><tr>'
                 .'<td class="t">'.self::e($assunto !== '' ? $assunto : $disc)
-                .($assunto !== '' ? '<div class="dsc">'.self::e($d->semPrefixoCurso($disc)).'</div>' : '').'</td>'
+                .($assunto !== '' ? '<div class="dsc">'.self::e($d->nomeDisciplina($disc)).'</div>' : '').'</td>'
                 .'<td class="p" style="width:90px">'.self::e($qtd).'</td></tr></table>';
         }
         $html .= '<div class="panel">'.$linhas.'</div>';
