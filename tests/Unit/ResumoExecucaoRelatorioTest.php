@@ -208,10 +208,86 @@ class ResumoExecucaoRelatorioTest extends TestCase
         $this->assertSame('log_download_20261001_103005.txt', $resumo->logArquivo);
         $this->assertSame(2, $resumo->pdfsGerados());
         $this->assertSame(1, $resumo->emailsEnviados());
-        $this->assertSame(1, $resumo->falhasEnvio());
+        $this->assertSame(0, $resumo->falhasEnvio());
         $this->assertSame(['Aluno Teste'], $resumo->geradosSemEnvio());
         $this->assertSame(1, $resumo->pdfsRemovidos);
         $this->assertFileDoesNotExist($this->pasta.'/relatorio_consolidado_20261001_1030_Giovanna_2.pdf');
+    }
+
+    public function test_cadastro_local_fora_dos_ativos_nao_conta_como_pdf_nao_localizado(): void
+    {
+        Mail::fake();
+        $amanda = Aluno::create([
+            'tutory_id' => '27',
+            'nome' => 'Amanda Carvalho Vieira',
+            'email' => 'uni.amandav01@gmail.com',
+            'recebe_email' => true,
+            'ativo' => true,
+        ]);
+        $amanda->forceFill(['created_at' => '2026-08-01 09:00:00'])->save();
+
+        $downloader = new CoachReportDownloader('2', static function (): void {});
+        $ref = new ReflectionClass($downloader);
+        $ref->getProperty('pastaDownload')->setValue($downloader, $this->pasta);
+        $resumo = new ResumoExecucaoRelatorio(
+            inicio: new DateTimeImmutable('2026-11-01 10:30:02'),
+            periodoRotulo: '16/10/2026 a 31/10/2026',
+            motor: 'Dompdf',
+            chaveEnvio: 'tutory.envio.periodo.2.2026-10',
+            pasta: $this->pasta,
+        );
+        $ref->getProperty('resumoExecucao')->setValue($downloader, $resumo);
+        $registrar = $ref->getMethod('registrarGeracao');
+        $registrar->setAccessible(true);
+        $registrar->invoke($downloader, [
+            ['nome' => 'Giovanna Campos', 'sucesso' => true],
+        ], $this->pasta.'/log_download_20261101_103002.txt');
+
+        $enviar = $ref->getMethod('enviarEmailsDosAlunos');
+        $enviar->setAccessible(true);
+        $enviar->invoke($downloader);
+
+        Mail::assertNothingSent();
+        $this->assertSame(0, $resumo->falhasEnvio());
+        $this->assertSame([], $resumo->semPdf());
+    }
+
+    public function test_ativo_da_tutory_sem_arquivo_continua_pdf_nao_localizado(): void
+    {
+        Mail::fake();
+        $aluno = Aluno::create([
+            'tutory_id' => '7711',
+            'nome' => 'Giovanna Campos',
+            'email' => 'giovanna.campos@sempreceub.com',
+            'recebe_email' => true,
+            'ativo' => true,
+        ]);
+        $aluno->forceFill(['created_at' => '2026-08-01 09:00:00'])->save();
+
+        $downloader = new CoachReportDownloader('2', static function (): void {});
+        $ref = new ReflectionClass($downloader);
+        $ref->getProperty('pastaDownload')->setValue($downloader, $this->pasta);
+        $resumo = new ResumoExecucaoRelatorio(
+            inicio: new DateTimeImmutable('2026-11-01 10:30:02'),
+            periodoRotulo: '16/10/2026 a 31/10/2026',
+            motor: 'Dompdf',
+            chaveEnvio: 'tutory.envio.periodo.2.2026-10',
+            pasta: $this->pasta,
+        );
+        $ref->getProperty('resumoExecucao')->setValue($downloader, $resumo);
+        $registrar = $ref->getMethod('registrarGeracao');
+        $registrar->setAccessible(true);
+        $registrar->invoke($downloader, [
+            ['nome' => 'Giovanna Campos', 'sucesso' => true],
+        ], $this->pasta.'/log_download_20261101_103002.txt');
+
+        $enviar = $ref->getMethod('enviarEmailsDosAlunos');
+        $enviar->setAccessible(true);
+        $enviar->invoke($downloader);
+
+        Mail::assertNothingSent();
+        $this->assertSame(1, $resumo->falhasEnvio());
+        $this->assertSame('Giovanna Campos', $resumo->semPdf()[0]['nome'] ?? null);
     }
 
     public function test_falha_ao_enviar_o_resumo_nao_interrompe(): void

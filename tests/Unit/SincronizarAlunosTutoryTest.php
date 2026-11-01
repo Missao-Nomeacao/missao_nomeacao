@@ -82,13 +82,14 @@ class SincronizarAlunosTutoryTest extends TestCase
         ));
     }
 
-    public function test_log_quando_nome_duplicado_no_cadastro(): void
+    public function test_mesmo_nome_com_tutory_id_diferente_atualiza_o_cadastro(): void
     {
-        Aluno::create([
-            'tutory_id' => '1111',
-            'nome' => 'Ana Souza',
-            'email' => 'ana.existente@example.com',
+        $aluno = Aluno::create([
+            'tutory_id' => '27',
+            'nome' => 'Amanda Carvalho Vieira',
+            'email' => 'uni.amandav01@gmail.com',
             'recebe_email' => true,
+            'ativo' => false,
         ]);
         $logs = [];
         $sync = new SincronizarAlunosTutory(logger: function (string $message) use (&$logs): void {
@@ -96,16 +97,38 @@ class SincronizarAlunosTutoryTest extends TestCase
         });
 
         $resultado = $sync->sincronizarLista([
-            ['id' => '3003', 'nome' => 'Ana Souza', 'email' => 'ana.nova@example.com'],
+            ['id' => '377712', 'nome' => 'Amanda Carvalho Vieira', 'email' => 'uni.amandav01@gmail.com'],
         ]);
 
         $this->assertSame(0, $resultado['criados']);
-        $this->assertSame(1, $resultado['pulados']);
+        $this->assertSame(0, $resultado['pulados']);
+        $this->assertSame(1, $resultado['atualizados']);
         $this->assertSame(1, Aluno::query()->count());
-        $this->assertSame('ana.existente@example.com', Aluno::query()->first()->email);
+        $aluno->refresh();
+        $this->assertSame('377712', $aluno->tutory_id);
+        $this->assertTrue($aluno->ativo);
+        $this->assertSame('uni.amandav01@gmail.com', $aluno->email);
         $this->assertTrue(collect($logs)->contains(
-            fn (string $m) => str_contains($m, 'Nome duplicado ao cadastrar') && str_contains($m, 'Ana Souza')
+            fn (string $m) => str_contains($m, 'tutory_id divergente') && str_contains($m, '27') && str_contains($m, '377712')
         ));
+    }
+
+    public function test_inativa_pelo_nome_quando_o_tutory_id_mudou(): void
+    {
+        $aluno = Aluno::create([
+            'tutory_id' => '27',
+            'nome' => 'Amanda Carvalho Vieira',
+            'email' => 'uni.amandav01@gmail.com',
+            'recebe_email' => true,
+            'ativo' => true,
+        ]);
+        $sync = new SincronizarAlunosTutory(logger: static function (): void {});
+        $sync->atualizarInativos([
+            ['id' => '377712', 'nome' => 'Amanda Carvalho Vieira', 'email' => 'uni.amandav01@gmail.com'],
+        ]);
+
+        $this->assertFalse($aluno->fresh()->ativo);
+        $this->assertSame(1, Aluno::query()->count());
     }
 
     public function test_log_quando_nome_duplicado_na_edicao(): void

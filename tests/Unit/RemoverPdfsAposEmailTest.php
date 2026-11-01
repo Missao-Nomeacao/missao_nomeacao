@@ -109,6 +109,28 @@ class RemoverPdfsAposEmailTest extends TestCase
         $this->assertFileDoesNotExist($pdf);
     }
 
+    public function test_nao_envia_para_aluno_inativo_mesmo_com_pdf(): void
+    {
+        Mail::fake();
+
+        $aluno = Aluno::create([
+            'tutory_id' => '27',
+            'nome' => 'Amanda Carvalho Vieira',
+            'email' => 'uni.amandav01@gmail.com',
+            'recebe_email' => true,
+            'ativo' => false,
+        ]);
+        $aluno->forceFill(['created_at' => '2026-08-01 09:00:00'])->save();
+
+        $pdf = $this->pasta.'/relatorio_consolidado_20260815_1200_Amanda_Carvalho_Vieira_1.pdf';
+        file_put_contents($pdf, '%PDF-1.4 leftover');
+
+        $this->chamar('enviarEmailsDosAlunos', $this->downloader());
+
+        Mail::assertNothingSent();
+        $this->assertFileDoesNotExist($pdf);
+    }
+
     private function downloader(): CoachReportDownloader
     {
         $downloader = new CoachReportDownloader('1', static function (): void {});

@@ -142,6 +142,14 @@ class CoachReportDownloader
 
     private ?ResumoExecucaoRelatorio $resumoExecucao = null;
 
+    /**
+     * Ativos da Tutory nesta execução (id + nome), para não tratar cadastro
+     * local leftover como "PDF não localizado".
+     *
+     * @var list<array{nome: string, id: string}>
+     */
+    private array $alunosAtivosTutory = [];
+
     public function __construct(
         string $periodo,
         ?callable $logger = null,
@@ -516,6 +524,7 @@ class CoachReportDownloader
         }
 
         $this->log('Total de alunos ativos: '.count($alunos));
+        $this->alunosAtivosTutory = $alunos;
 
         return $alunos;
     }
@@ -1744,6 +1753,36 @@ class CoachReportDownloader
     }
 
     /**
+     * Cadastro local só vira "PDF não localizado" se o aluno estava na lista
+     * de ativos da Tutory (ou nas gerações desta execução).
+     */
+    private function constaComoAtivoNaTutory(Aluno $aluno): bool
+    {
+        $idLocal = trim((string) $aluno->tutory_id);
+        $nomeLocal = $this->sanitizarNomeArquivo($aluno->nome);
+
+        foreach ($this->alunosAtivosTutory as $ativo) {
+            if ($idLocal !== '' && $idLocal === trim((string) $ativo['id'])) {
+                return true;
+            }
+            if ($this->nomesArquivoSaoCompativeis($nomeLocal, $this->sanitizarNomeArquivo($ativo['nome']))) {
+                return true;
+            }
+        }
+
+        if ($this->resumoExecucao !== null) {
+            foreach ($this->resumoExecucao->geracoes as $geracao) {
+                $nome = (string) ($geracao['nome'] ?? '');
+                if ($nome !== '' && $this->nomesArquivoSaoCompativeis($nomeLocal, $this->sanitizarNomeArquivo($nome))) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * Lista alunos do admin, envia os PDFs por e-mail e apaga os arquivos da pasta.
      * Se o SQLite local não existir, os PDFs são preservados.
      */
@@ -1800,6 +1839,12 @@ class CoachReportDownloader
         foreach ($alunos as $aluno) {
             $this->log("[{$aluno->nome}] e-mail={$aluno->email} | recebe_email=".($aluno->recebe_email ? 'sim' : 'não'));
 
+            if (! $aluno->ativo) {
+                $this->log("[{$aluno->nome}] Aluno inativo no admin; e-mail não tentado.");
+
+                continue;
+            }
+
             if ($aluno->ehNovato()) {
                 $this->enviarBoasVindasNovato($aluno, $boasVindas, $pulados, $falhas);
 
@@ -1808,6 +1853,11 @@ class CoachReportDownloader
 
             $pdfs = $this->encontrarPdfsAluno($aluno->nome);
             if ($pdfs === []) {
+                if (! $this->constaComoAtivoNaTutory($aluno)) {
+                    $this->log("[{$aluno->nome}] Cadastro local fora dos ativos da Tutory nesta execução. Sem PDF, e-mail não tentado.");
+
+                    continue;
+                }
                 $this->log("[{$aluno->nome}] Nenhum PDF encontrado em {$this->pastaDownload}");
                 $this->log("[{$aluno->nome}] Dica: o nome no admin deve coincidir com o do Tutory.");
                 $this->registrarEnvio($aluno->nome, (string) $aluno->email, ResumoExecucaoRelatorio::SEM_PDF);

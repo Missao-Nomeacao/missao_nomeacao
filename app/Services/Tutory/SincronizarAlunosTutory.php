@@ -14,7 +14,7 @@ use Throwable;
  * recebe_email fica sempre true. O status local nasce true.
  * Só cadastra quem está ativo na Tutory e ainda não existe no portal.
  * Quem já existe e está em status=desativados na Tutory fica inativo.
- * Nome é único: duplicidade só é logada.
+ * Nome é único: o mesmo aluno reaproveita o cadastro local mesmo se o tutory_id mudou.
  * O cadastro "Aluno teste" da Tutory é ignorado e não entra na tabela local.
  */
 class SincronizarAlunosTutory
@@ -150,12 +150,9 @@ class SincronizarAlunosTutory
         if ($porNome === null) {
             return null;
         }
-        $tutoryIdExistente = trim((string) $porNome->tutory_id);
-        if ($tutoryIdExistente === '' || $tutoryIdExistente === $origem['id']) {
-            return $porNome;
-        }
 
-        return null;
+        // Nome é único no admin: o mesmo aluno pode reaparecer na Tutory com outro id.
+        return $porNome;
     }
 
     /**
@@ -220,6 +217,8 @@ class SincronizarAlunosTutory
         $mudou = false;
 
         if ($origem['id'] !== '' && (string) $aluno->tutory_id !== $origem['id']) {
+            $antes = filled($aluno->tutory_id) ? $aluno->tutory_id : '—';
+            $this->log("tutory_id divergente: plataforma \"{$antes}\" → Tutory \"{$origem['id']}\" (aluno id {$aluno->id}, nome {$aluno->nome}).");
             $aluno->tutory_id = $origem['id'];
             $mudou = true;
         }
@@ -256,6 +255,11 @@ class SincronizarAlunosTutory
 
         if (! $aluno->recebe_email) {
             $aluno->recebe_email = true;
+            $mudou = true;
+        }
+
+        if (! $aluno->ativo) {
+            $aluno->ativo = true;
             $mudou = true;
         }
 
