@@ -123,7 +123,7 @@ O envio de e-mail anexa o PDF consolidado mais recente do aluno para o `--period
 
 ## Contingência (admin)
 
-Em `/admin/relatorios-pdf-contingencia` a mentora gera o PDF de **um aluno** e **um período já liberado**. Há duas ações:
+Em `/admin/relatorios-pdf-contingencia` a mentora gera o PDF de **um aluno** e **um período já liberado**. Antes de pedir o relatório, o job confirma o id atual na Tutory (ativos e, se preciso, desativados) pelo nome — um `tutory_id` antigo no admin não aborta a geração. A falha da Tutory aparece no overlay e em `storage/logs/pdf-contingencia.log`. Há duas ações:
 
 - **Baixar PDF** — só o download, sem e-mail (comportamento anterior).
 - **Gerar e enviar e-mail** — gera o consolidado na Tutory, anexa no e-mail do aluno e envia com o mesmo CCO dos relatórios oficiais. O download continua disponível. A contingência **não grava** as faixas no dashboard (pode ser um período antigo).

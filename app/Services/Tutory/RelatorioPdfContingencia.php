@@ -50,7 +50,7 @@ class RelatorioPdfContingencia
         );
 
         try {
-            return $downloader->gerarPdfParaAluno($tutoryId, $aluno->nome);
+            return $downloader->gerarPdfParaAluno($tutoryId, $aluno->nome, $aluno);
         } catch (Throwable $exc) {
             $this->registrarErro('Falha ao gerar o PDF da contingência.', $aluno, $periodo, $exc);
             throw $exc;

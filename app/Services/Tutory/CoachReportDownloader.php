@@ -150,6 +150,8 @@ class CoachReportDownloader
      */
     private array $alunosAtivosTutory = [];
 
+    private ?string $ultimoErroPdf = null;
+
     public function __construct(
         string $periodo,
         ?callable $logger = null,
@@ -250,8 +252,9 @@ class CoachReportDownloader
     /**
      * Gera o PDF consolidado de um único aluno e devolve o caminho do arquivo.
      * Não envia e-mail e não apaga o PDF (o admin faz o download).
+     * Se o id local estiver velho, localiza o aluno pelo nome na Tutory.
      */
-    public function gerarPdfParaAluno(string $tutoryId, string $nome): string
+    public function gerarPdfParaAluno(string $tutoryId, string $nome, ?Aluno $alunoLocal = null): string
     {
         $this->validarConfig();
         $tutoryId = trim($tutoryId);
@@ -260,17 +263,20 @@ class CoachReportDownloader
             throw new RuntimeException('Informe o aluno da Tutory (id e nome).');
         }
 
+        $this->ultimoErroPdf = null;
+
         try {
             $this->login();
-            $aluno = ['id' => $tutoryId, 'nome' => $nome];
+            $aluno = $this->resolverAlunoAtual($tutoryId, $nome, $alunoLocal);
             $relatorios = $this->relatorios();
             $arquivo = null;
             for ($tentativa = 1; $tentativa <= self::MAX_TENTATIVAS; $tentativa++) {
-                $this->log("Aluno {$nome} (tentativa {$tentativa}/".self::MAX_TENTATIVAS.')');
+                $this->log("Aluno {$aluno['nome']} id={$aluno['id']} (tentativa {$tentativa}/".self::MAX_TENTATIVAS.')');
                 try {
                     $arquivo = $this->processarAlunoConsolidado($aluno, $relatorios);
                 } catch (Throwable $exc) {
-                    $this->log("[{$nome}] ERRO: ".$exc->getMessage());
+                    $this->ultimoErroPdf = $exc->getMessage();
+                    $this->log("[{$aluno['nome']}] ERRO: ".$exc->getMessage());
                     $arquivo = null;
                 }
                 if ($arquivo !== null) {
@@ -278,7 +284,7 @@ class CoachReportDownloader
                 }
             }
 
-            throw new RuntimeException('Não foi possível gerar o PDF consolidado para '.$nome.'.');
+            throw new RuntimeException($this->mensagemFalhaPdf($aluno['nome'], $aluno['id']));
         } catch (Throwable $exc) {
             $this->log('ERRO FATAL:');
             $this->log((string) $exc);
@@ -530,6 +536,144 @@ class CoachReportDownloader
     }
 
     /**
+     * Troca o id local pelo atual da Tutory quando o cadastro foi recriado.
+     *
+     * @return array{nome: string, id: string}
+     */
+    private function resolverAlunoAtual(string $tutoryId, string $nome, ?Aluno $alunoLocal): array
+    {
+        $ativos = $this->coletarAlunosAtivos();
+        $achado = $this->localizarAlunoNaLista($tutoryId, $nome, $ativos);
+        $fonte = 'ativos';
+        if ($achado === null) {
+            $desativados = $this->coletarAlunosDesativados();
+            $achado = $this->localizarAlunoNaLista($tutoryId, $nome, $desativados);
+            $fonte = 'desativados';
+        }
+        if ($achado === null) {
+            throw new RuntimeException(
+                $nome.' não está na Tutory com o id '.$tutoryId
+                .' nem pelo nome (ativos ou desativados). Sincronize os alunos e tente de novo.'
+            );
+        }
+
+        if ($achado['id'] !== $tutoryId) {
+            $this->log("[{$nome}] tutory_id local {$tutoryId} → Tutory {$achado['id']} ({$fonte}).");
+        } else {
+            $this->log("[{$nome}] Encontrada na Tutory ({$fonte}) com id {$achado['id']}.");
+        }
+
+        if ($alunoLocal !== null) {
+            $mudou = false;
+            if ((string) $alunoLocal->tutory_id !== $achado['id']) {
+                $alunoLocal->tutory_id = $achado['id'];
+                $mudou = true;
+            }
+            if ($fonte === 'ativos' && ! $alunoLocal->ativo) {
+                $alunoLocal->ativo = true;
+                $mudou = true;
+            }
+            if ($fonte === 'desativados' && $alunoLocal->ativo) {
+                $alunoLocal->ativo = false;
+                $mudou = true;
+            }
+            if ($mudou) {
+                try {
+                    $alunoLocal->save();
+                } catch (Throwable $exc) {
+                    $this->log("[{$nome}] Não atualizei o cadastro local: ".$exc->getMessage());
+                }
+            }
+        }
+
+        return ['id' => $achado['id'], 'nome' => $achado['nome'] !== '' ? $achado['nome'] : $nome];
+    }
+
+    /**
+     * @param  list<array{nome: string, id: string}>  $lista
+     * @return array{nome: string, id: string}|null
+     */
+    private function localizarAlunoNaLista(string $tutoryId, string $nome, array $lista): ?array
+    {
+        foreach ($lista as $item) {
+            if ($tutoryId !== '' && trim((string) $item['id']) === $tutoryId) {
+                return $item;
+            }
+        }
+
+        $nomeLocal = $this->sanitizarNomeArquivo($nome);
+        foreach ($lista as $item) {
+            if ($this->nomesArquivoSaoCompativeis($nomeLocal, $this->sanitizarNomeArquivo($item['nome']))) {
+                return $item;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @return list<array{nome: string, id: string}>
+     */
+    private function coletarAlunosDesativados(): array
+    {
+        $this->log('Abrindo /alunos/consulta com status=desativados...');
+        $resp = $this->client()->get('/alunos/consulta', ['status' => 'desativados']);
+        $html = $resp->body();
+        if (! str_contains($html, 'pesquisa-aluno-container')) {
+            $resp = $this->client()->asForm()->post('/alunos/consulta', ['status' => 'desativados']);
+            $html = $resp->body();
+        }
+        if (! str_contains($html, 'pesquisa-aluno-container')) {
+            $this->log('Lista de desativados não encontrada em /alunos/consulta.');
+
+            return [];
+        }
+
+        $alunos = [];
+        $vistos = [];
+        $pagina = 1;
+        $urlAtual = self::BASE.'/alunos/consulta?status=desativados';
+
+        while (true) {
+            $paginaAlunos = $this->parseAlunosDaPagina($html);
+            $this->log("Coletando desativados página {$pagina}: ".count($paginaAlunos).' aluno(s)');
+            foreach ($paginaAlunos as $aluno) {
+                if ($aluno['id'] === '' || isset($vistos[$aluno['id']])) {
+                    continue;
+                }
+                $vistos[$aluno['id']] = true;
+                $alunos[] = $aluno;
+            }
+
+            $proxima = $this->proximaPaginaUrl($html, $urlAtual);
+            if ($proxima === null) {
+                break;
+            }
+            $html = $this->client()->get($proxima)->body();
+            $urlAtual = $proxima;
+            $pagina++;
+            if ($pagina > 100) {
+                break;
+            }
+        }
+
+        $this->log('Total de alunos desativados: '.count($alunos));
+
+        return $alunos;
+    }
+
+    private function mensagemFalhaPdf(string $nome, string $tutoryId): string
+    {
+        $base = 'Não foi possível gerar o PDF consolidado para '.$nome.' (id '.$tutoryId.').';
+        $detalhe = trim((string) $this->ultimoErroPdf);
+        if ($detalhe === '' || $detalhe === $base) {
+            return $base.' Veja o overlay e storage/logs/pdf-contingencia.log.';
+        }
+
+        return $base.' '.$detalhe;
+    }
+
+    /**
      * @return list<array{nome: string, id: string}>
      */
     private function parseAlunosDaPagina(string $html): array
@@ -685,6 +829,8 @@ class CoachReportDownloader
         $json = $resp->json();
         if (! is_array($json) || empty($json['result'])) {
             $erro = is_array($json) ? (string) ($json['error'] ?? $resp->body()) : $resp->body();
+            $erro = mb_substr(trim($erro), 0, 300);
+            $this->ultimoErroPdf = "Falha ao gerar {$rotulo} na Tutory (id {$id}): {$erro}";
             $this->log("[{$nome}] [{$rotulo}] Falha ao gerar: ".$erro);
 
             return null;
@@ -692,6 +838,8 @@ class CoachReportDownloader
 
         $lista = $json['data'] ?? null;
         if (! is_array($lista) || $lista === [] || empty($lista[0]['token'])) {
+            $corpo = mb_substr(trim($resp->body()), 0, 300);
+            $this->ultimoErroPdf = "Resposta sem token de relatório ({$rotulo}, id {$id}): {$corpo}";
             $this->log("[{$nome}] [{$rotulo}] Resposta sem token de relatório: ".$resp->body());
 
             return null;
@@ -706,6 +854,7 @@ class CoachReportDownloader
             ->get('/documentos/relatorios/'.$model, ['key' => $key]);
 
         if ($pagina->status() >= 400 || (! str_contains($pagina->body(), 'btn_save') && ! str_contains($pagina->body(), 'btn_download'))) {
+            $this->ultimoErroPdf = "Página do relatório {$rotulo} inválida (HTTP {$pagina->status()}, id {$id}).";
             $this->log("[{$nome}] [{$rotulo}] Página do relatório inválida (HTTP {$pagina->status()})");
 
             return null;
@@ -3967,7 +4116,9 @@ HTML;
         foreach ($relatorios as $relatorio) {
             $pagina = $this->abrirPaginaRelatorio($aluno, $relatorio);
             if ($pagina === null) {
-                $this->log("[{$nome}] Falha ao abrir {$relatorio['nome']} — consolidado abortado");
+                $aviso = "[{$nome}] Falha ao abrir {$relatorio['nome']} — consolidado abortado";
+                $this->ultimoErroPdf = $this->ultimoErroPdf ?: $aviso;
+                $this->log($aviso);
 
                 return null;
             }
@@ -3992,6 +4143,7 @@ HTML;
         }
         if (! $ok) {
             @unlink($destino);
+            $this->ultimoErroPdf = "[{$nome}] Falha ao montar o PDF consolidado com Dompdf.";
 
             return null;
         }
