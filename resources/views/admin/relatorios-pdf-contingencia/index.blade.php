@@ -29,7 +29,8 @@
             @csrf
             <input type="hidden" name="progress_token" id="progress-token" value="{{ $progressToken }}">
 
-            <h2 class="text-lg font-bold text-gray-800 mb-1">Gerar PDF</h2>
+            <h2 class="text-lg font-bold text-gray-800 mb-1">Gerar PDF e reenviar e-mail</h2>
+            <p class="text-sm text-gray-500 mb-6">Baixa o consolidado ou gera de novo na Tutory e reenvia o e-mail do aluno, com CCO para a mentora. Falhas de SMTP e de geração aparecem no overlay e em <code class="text-xs bg-gray-100 px-1 rounded">storage/logs/pdf-contingencia.log</code>.</p>
             <div class="mb-6">
                 <span class="block text-sm font-semibold text-gray-700">Aluno *</span>
                 <div id="combo-aluno" class="mt-2">
@@ -106,9 +107,12 @@
                 </div>
             </div>
 
-            <div class="flex justify-end">
-                <button id="btn-gerar-pdf" type="submit" class="px-6 py-3 bg-primary hover:bg-primary-light text-white rounded font-medium transition" {{ $alunos->isEmpty() || $periodos === [] ? 'disabled' : '' }}>
-                    Gerar PDF
+            <div class="flex flex-col sm:flex-row justify-end gap-3">
+                <button id="btn-gerar-pdf" type="submit" data-acao="baixar" class="px-6 py-3 bg-white border border-primary text-primary hover:bg-gray-50 rounded font-medium transition" {{ $alunos->isEmpty() || $periodos === [] ? 'disabled' : '' }}>
+                    Baixar PDF
+                </button>
+                <button id="btn-enviar-email" type="submit" data-acao="enviar" class="px-6 py-3 bg-primary hover:bg-primary-light text-white rounded font-medium transition" {{ $alunos->isEmpty() || $periodos === [] ? 'disabled' : '' }}>
+                    Gerar e enviar e-mail
                 </button>
             </div>
         </form>
@@ -165,10 +169,15 @@
                 <span class="etapa-icone mt-0.5 w-5 h-5 rounded-full border border-gray-300 flex items-center justify-center text-xs">4</span>
                 <span>Preparando o download</span>
             </li>
+            <li id="overlay-pdf-etapa-email" data-step="5" class="hidden flex items-start gap-3 text-sm text-gray-500">
+                <span class="etapa-icone mt-0.5 w-5 h-5 rounded-full border border-gray-300 flex items-center justify-center text-xs">5</span>
+                <span>Enviando o e-mail</span>
+            </li>
         </ol>
 
         <p id="overlay-pdf-log" class="text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded p-3 min-h-[3.5rem]">Aguardando início…</p>
         <p id="overlay-pdf-erro" class="hidden mt-4 text-sm text-red-700 bg-red-50 border border-red-200 rounded p-3"></p>
+        <p id="overlay-pdf-aviso" class="hidden mt-4 text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded p-3"></p>
         <div class="mt-6 flex justify-end">
             <button type="button" id="overlay-pdf-fechar" class="hidden px-5 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded font-medium">Fechar</button>
         </div>
@@ -184,7 +193,12 @@
         const erroEl = document.getElementById('overlay-pdf-erro');
         const timerEl = document.getElementById('overlay-pdf-timer');
         const btn = document.getElementById('btn-gerar-pdf');
+        const btnEnviar = document.getElementById('btn-enviar-email');
         const btnFechar = document.getElementById('overlay-pdf-fechar');
+        const etapaEmail = document.getElementById('overlay-pdf-etapa-email');
+        const avisoEl = document.getElementById('overlay-pdf-aviso');
+        const tituloOverlay = document.getElementById('overlay-pdf-titulo');
+        const subtituloOverlay = document.getElementById('overlay-pdf-subtitulo');
         const comboAluno = document.getElementById('combo-aluno');
         const comboAlunoBtn = document.getElementById('combo-aluno-btn');
         const comboAlunoLista = document.getElementById('combo-aluno-lista');
@@ -263,11 +277,26 @@
         const periodoCombo = ligarCombo(comboPeriodo, comboPeriodoBtn, comboPeriodoLista, comboPeriodoLabel, campoPeriodo);
 
         const progressoUrl = @json(route('relatorios-pdf-contingencia.progresso'));
-        const etapas = [8, 28, 55, 82, 100];
+        const etapas = [8, 22, 45, 68, 88, 100];
         let pollId = null;
         let tickId = null;
         let startedAt = 0;
         let stepAtual = 1;
+        let enviandoEmail = false;
+
+        function botoes() {
+            return [btn, btnEnviar].filter(Boolean);
+        }
+
+        function setBusy(busy) {
+            botoes().forEach(function(b) {
+                if (busy) {
+                    b.disabled = true;
+                    return;
+                }
+                b.disabled = {{ $alunos->isEmpty() || $periodos === [] ? 'true' : 'false' }};
+            });
+        }
 
         function pad(n) {
             return String(n).padStart(2, '0');
@@ -292,14 +321,29 @@
                     icone.textContent = String(n);
                 }
             });
-            barra.style.width = etapas[Math.min(stepAtual, 4)] + '%';
+            barra.style.width = etapas[Math.min(stepAtual, etapas.length - 1)] + '%';
         }
 
         function abrirOverlay() {
             stepAtual = 1;
             erroEl.classList.add('hidden');
             erroEl.textContent = '';
+            if (avisoEl) {
+                avisoEl.classList.add('hidden');
+                avisoEl.textContent = '';
+            }
             btnFechar.classList.add('hidden');
+            if (tituloOverlay) {
+                tituloOverlay.textContent = enviandoEmail ? 'Gerando e enviando' : 'Gerando PDF';
+            }
+            if (subtituloOverlay) {
+                subtituloOverlay.textContent = enviandoEmail
+                    ? 'O PDF é gerado, o e-mail sai em seguida e o download continua disponível.'
+                    : 'Isso pode levar alguns minutos. Não feche esta página.';
+            }
+            if (etapaEmail) {
+                etapaEmail.classList.toggle('hidden', !enviandoEmail);
+            }
             logEl.textContent = 'Conectando à Tutory…';
             pintarEtapas(1);
             overlay.classList.remove('hidden');
@@ -327,7 +371,7 @@
         function fecharOverlay() {
             pararTimers();
             overlay.classList.add('hidden');
-            btn.disabled = false;
+            setBusy(false);
         }
 
         function mostrarErro(msg) {
@@ -335,10 +379,21 @@
             erroEl.textContent = msg || 'Falha ao gerar o PDF.';
             erroEl.classList.remove('hidden');
             btnFechar.classList.remove('hidden');
-            btn.disabled = false;
+            setBusy(false);
             barra.style.width = '100%';
             barra.classList.remove('bg-yellow-600');
             barra.classList.add('bg-red-600');
+        }
+
+        function mostrarAvisoEmail(msg) {
+            pararTimers();
+            if (avisoEl) {
+                avisoEl.textContent = msg || 'PDF gerado, mas o e-mail não saiu. Veja storage/logs/pdf-contingencia.log.';
+                avisoEl.classList.remove('hidden');
+            }
+            btnFechar.classList.remove('hidden');
+            setBusy(false);
+            barra.style.width = '100%';
         }
 
         function nomeArquivo(res) {
@@ -379,7 +434,9 @@
 
         form.addEventListener('submit', async function(ev) {
             ev.preventDefault();
-            if (btn.disabled) return;
+            const acao = (ev.submitter && ev.submitter.getAttribute('data-acao')) || 'baixar';
+            enviandoEmail = acao === 'enviar';
+            if (botoes().some(function(b) { return b.disabled && b.getAttribute('data-acao') === acao; })) return;
             if (!campoAluno || !campoAluno.value) {
                 if (comboAlunoBtn) comboAlunoBtn.classList.add('border-red-500');
                 alunoCombo.abrir();
@@ -390,7 +447,7 @@
                 periodoCombo.abrir();
                 return;
             }
-            btn.disabled = true;
+            setBusy(true);
             barra.classList.remove('bg-red-600');
             barra.classList.add('bg-yellow-600');
             abrirOverlay();
@@ -415,9 +472,11 @@
             }, 900);
 
             try {
+                const payload = new FormData(form);
+                payload.set('acao', acao);
                 const res = await fetch(form.action, {
                     method: 'POST',
-                    body: new FormData(form),
+                    body: payload,
                     headers: {
                         'Accept': 'application/json, application/pdf',
                         'X-Requested-With': 'XMLHttpRequest'
@@ -432,14 +491,26 @@
                     mostrarErro(await lerErro(res));
                     return;
                 }
-                pintarEtapas(4);
+                pintarEtapas(enviandoEmail ? 5 : 4);
                 barra.style.width = '100%';
-                logEl.textContent = 'PDF pronto. Iniciando o download…';
+                logEl.textContent = enviandoEmail ? 'Enviando o e-mail e iniciando o download…' : 'PDF pronto. Iniciando o download…';
                 await baixar(res);
                 pararTimers();
-                logEl.textContent = 'Download iniciado.';
+                const emailStatus = (res.headers.get('X-Contingencia-Email') || '').toLowerCase();
+                let emailMsg = res.headers.get('X-Contingencia-Email-Mensagem') || '';
+                try {
+                    emailMsg = decodeURIComponent(emailMsg);
+                } catch (e) {}
+                if (enviandoEmail && emailStatus === 'falhou') {
+                    mostrarAvisoEmail(emailMsg || 'PDF gerado, mas o e-mail não saiu. Veja storage/logs/pdf-contingencia.log.');
+                    logEl.textContent = 'Download iniciado. O e-mail falhou.';
+                    return;
+                }
+                logEl.textContent = enviandoEmail
+                    ? (emailMsg || 'E-mail enviado. Download iniciado.')
+                    : 'Download iniciado.';
                 btnFechar.classList.remove('hidden');
-                btn.disabled = false;
+                setBusy(false);
             } catch (err) {
                 mostrarErro(err && err.message ? err.message : 'Falha de rede ao gerar o PDF.');
             }

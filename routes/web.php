@@ -93,7 +93,7 @@ Route::middleware(['auth'])->prefix('admin')->group(function () {
     Route::put('/relatorios-pdf', [RelatorioPdfAdminController::class, 'update'])->name('relatorios-pdf.update');
     Route::get('/relatorios-pdf/preview', [RelatorioPdfAdminController::class, 'preview'])->name('relatorios-pdf.preview');
 
-    // Contingência: PDF de um aluno em períodos já liberados (download, sem e-mail)
+    // Contingência: PDF de um aluno em períodos já liberados (download e reenvio de e-mail)
     Route::get('/relatorios-pdf-contingencia', [RelatorioPdfContingenciaController::class, 'index'])->name('relatorios-pdf-contingencia.index');
     Route::put('/relatorios-pdf-contingencia', [RelatorioPdfContingenciaController::class, 'update'])->name('relatorios-pdf-contingencia.update');
     Route::get('/relatorios-pdf-contingencia/progresso', [RelatorioPdfContingenciaController::class, 'progresso'])->name('relatorios-pdf-contingencia.progresso');

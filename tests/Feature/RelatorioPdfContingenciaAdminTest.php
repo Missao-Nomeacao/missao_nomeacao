@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Mail\EmailRelatorioCoach;
 use App\Models\Aluno;
 use App\Models\Configuracao;
 use App\Models\User;
@@ -11,6 +12,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Mail;
 use Mockery;
+use RuntimeException;
 use Tests\TestCase;
 
 class RelatorioPdfContingenciaAdminTest extends TestCase
@@ -27,6 +29,7 @@ class RelatorioPdfContingenciaAdminTest extends TestCase
     {
         $this->get(route('relatorios-pdf-contingencia.index'))->assertRedirect(route('login'));
         $this->post(route('relatorios-pdf-contingencia.gerar'), [])->assertRedirect(route('login'));
+        $this->post(route('relatorios-pdf-contingencia.gerar'), ['acao' => 'enviar'])->assertRedirect(route('login'));
     }
 
     public function test_admin_ve_alunos_ativos_e_os_12_periodos_da_janela(): void
@@ -57,6 +60,9 @@ class RelatorioPdfContingenciaAdminTest extends TestCase
             ->assertDontSee('SETEMBRO - PERÍODO 2')
             ->assertDontSee('OUTUBRO - PERÍODO 1')
             ->assertSee('Gerando PDF')
+            ->assertSee('Baixar PDF')
+            ->assertSee('Gerar e enviar e-mail')
+            ->assertSee('pdf-contingencia.log')
             ->assertSee('Meses visíveis')
             ->assertSee('combo-aluno-lista')
             ->assertSee('combo-periodo-lista')
@@ -221,5 +227,145 @@ class RelatorioPdfContingenciaAdminTest extends TestCase
         $this->assertStringContainsString('application/pdf', (string) $response->headers->get('Content-Type'));
         Mail::assertNothingSent();
         $this->assertSame('Excelente', $aluno->fresh()->last_performance);
+        $this->assertSame(
+            RelatorioPdfContingencia::EMAIL_NAO_SOLICITADO,
+            $response->headers->get(RelatorioPdfContingencia::HEADER_EMAIL)
+        );
+    }
+
+    public function test_reenvia_email_e_mantem_o_download(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-09-17 12:00:00', 'America/Sao_Paulo'));
+        Mail::fake();
+        $user = User::factory()->create();
+        $aluno = Aluno::create([
+            'tutory_id' => '7711',
+            'nome' => 'Giovanna',
+            'email' => 'giovanna@example.com',
+            'recebe_email' => false,
+            'last_performance' => 'Excelente',
+        ]);
+        $aluno->forceFill(['created_at' => '2026-08-01 09:00:00'])->save();
+
+        $caminho = sys_get_temp_dir().'/relatorio_consolidado_contingencia_'.uniqid('', true).'.pdf';
+        file_put_contents($caminho, '%PDF-1.4 contingencia');
+
+        $fake = Mockery::mock(RelatorioPdfContingencia::class)->makePartial();
+        $fake->shouldReceive('gerar')
+            ->once()
+            ->andReturn($caminho);
+        $this->app->instance(RelatorioPdfContingencia::class, $fake);
+
+        $response = $this->actingAs($user)
+            ->post(route('relatorios-pdf-contingencia.gerar'), [
+                'aluno_id' => $aluno->id,
+                'periodo' => '2026-09|1',
+                'acao' => 'enviar',
+            ]);
+
+        $response->assertOk();
+        $response->assertDownload(basename($caminho));
+        $this->assertSame(
+            RelatorioPdfContingencia::EMAIL_ENVIADO,
+            $response->headers->get(RelatorioPdfContingencia::HEADER_EMAIL)
+        );
+        Mail::assertSent(EmailRelatorioCoach::class, function (EmailRelatorioCoach $mail) use ($aluno): bool {
+            return $mail->hasTo($aluno->email)
+                && $mail->hasBcc('nayara@missaonomeacao.com.br');
+        });
+        $this->assertSame('Excelente', $aluno->fresh()->last_performance);
+    }
+
+    public function test_nao_reenvia_email_da_mentora(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-09-17 12:00:00', 'America/Sao_Paulo'));
+        Mail::fake();
+        $user = User::factory()->create();
+        $aluno = Aluno::create([
+            'tutory_id' => '9001',
+            'nome' => 'Nayara Oliveira',
+            'email' => 'nayaradeoliveira.contato@gmail.com',
+            'recebe_email' => true,
+        ]);
+
+        $this->actingAs($user)
+            ->from(route('relatorios-pdf-contingencia.index'))
+            ->post(route('relatorios-pdf-contingencia.gerar'), [
+                'aluno_id' => $aluno->id,
+                'periodo' => '2026-09|1',
+                'acao' => 'enviar',
+            ])
+            ->assertRedirect(route('relatorios-pdf-contingencia.index'))
+            ->assertSessionHasErrors('enviar');
+
+        Mail::assertNothingSent();
+    }
+
+    public function test_nao_reenvia_quando_o_email_e_invalido(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-09-17 12:00:00', 'America/Sao_Paulo'));
+        Mail::fake();
+        $user = User::factory()->create();
+        $aluno = Aluno::create([
+            'tutory_id' => '7711',
+            'nome' => 'Giovanna',
+            'email' => 'email-invalido',
+            'recebe_email' => true,
+        ]);
+
+        $this->actingAs($user)
+            ->from(route('relatorios-pdf-contingencia.index'))
+            ->post(route('relatorios-pdf-contingencia.gerar'), [
+                'aluno_id' => $aluno->id,
+                'periodo' => '2026-09|1',
+                'acao' => 'enviar',
+            ])
+            ->assertRedirect(route('relatorios-pdf-contingencia.index'))
+            ->assertSessionHasErrors('enviar');
+
+        Mail::assertNothingSent();
+    }
+
+    public function test_falha_no_smtp_ainda_oferece_o_pdf(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-09-17 12:00:00', 'America/Sao_Paulo'));
+        $user = User::factory()->create();
+        $aluno = Aluno::create([
+            'tutory_id' => '7711',
+            'nome' => 'Giovanna',
+            'email' => 'giovanna@example.com',
+            'recebe_email' => true,
+        ]);
+        $aluno->forceFill(['created_at' => '2026-08-01 09:00:00'])->save();
+
+        $caminho = sys_get_temp_dir().'/relatorio_consolidado_contingencia_'.uniqid('', true).'.pdf';
+        file_put_contents($caminho, '%PDF-1.4 contingencia');
+
+        $fake = Mockery::mock(RelatorioPdfContingencia::class)->makePartial();
+        $fake->shouldReceive('gerar')
+            ->once()
+            ->andReturn($caminho);
+        $fake->shouldReceive('enviar')
+            ->once()
+            ->andThrow(new RuntimeException('Não foi possível enviar o e-mail: SMTP recusou.'));
+        $this->app->instance(RelatorioPdfContingencia::class, $fake);
+
+        $response = $this->actingAs($user)
+            ->post(route('relatorios-pdf-contingencia.gerar'), [
+                'aluno_id' => $aluno->id,
+                'periodo' => '2026-09|1',
+                'acao' => 'enviar',
+            ]);
+
+        $response->assertOk();
+        $response->assertDownload(basename($caminho));
+        $this->assertSame(
+            RelatorioPdfContingencia::EMAIL_FALHOU,
+            $response->headers->get(RelatorioPdfContingencia::HEADER_EMAIL)
+        );
+        $this->assertStringContainsString(
+            'SMTP',
+            rawurldecode((string) $response->headers->get(RelatorioPdfContingencia::HEADER_EMAIL_MENSAGEM))
+        );
     }
 }

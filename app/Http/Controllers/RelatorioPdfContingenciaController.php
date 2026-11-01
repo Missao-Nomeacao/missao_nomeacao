@@ -43,8 +43,8 @@ class RelatorioPdfContingenciaController extends Controller
             'meses' => [
                 'required',
                 'integer',
-                'min:' . RelatorioPeriodoCatalog::MESES_MIN,
-                'max:' . $max,
+                'min:'.RelatorioPeriodoCatalog::MESES_MIN,
+                'max:'.$max,
             ],
         ], [
             'meses.required' => 'Informe a quantidade de meses.',
@@ -87,11 +87,13 @@ class RelatorioPdfContingenciaController extends Controller
             ],
             'periodo' => ['required', 'string', Rule::in($chaves)],
             'progress_token' => ['nullable', 'string', 'uuid'],
+            'acao' => ['nullable', 'string', Rule::in(['baixar', 'enviar'])],
         ], [
             'aluno_id.required' => 'Selecione um aluno.',
             'aluno_id.exists' => 'Aluno inválido ou sem vínculo com a Tutory.',
             'periodo.required' => 'Selecione o mês/período.',
             'periodo.in' => 'Este período ainda não está disponível.',
+            'acao.in' => 'Ação inválida. Use baixar ou enviar.',
         ]);
 
         $periodo = $catalog->encontrar((string) $data['periodo']);
@@ -100,7 +102,19 @@ class RelatorioPdfContingenciaController extends Controller
         }
 
         $aluno = Aluno::query()->findOrFail($data['aluno_id']);
+        $enviar = ($data['acao'] ?? 'baixar') === 'enviar';
         $token = (string) ($data['progress_token'] ?? '');
+
+        if ($enviar) {
+            try {
+                $contingencia->validarEnvio($aluno);
+            } catch (Throwable $exc) {
+                $this->gravarProgresso($token, 0, $exc->getMessage(), 'error');
+
+                return $this->falha($request, ['enviar' => $exc->getMessage()]);
+            }
+        }
+
         $this->gravarProgresso($token, 1, 'Conectando à Tutory…', 'running');
         $this->liberarSessao();
 
@@ -117,7 +131,7 @@ class RelatorioPdfContingenciaController extends Controller
         } catch (Throwable $exc) {
             $this->gravarProgresso($token, 0, $exc->getMessage(), 'error');
 
-            return $this->falha($request, ['gerar' => 'Não foi possível gerar o PDF: ' . $exc->getMessage()]);
+            return $this->falha($request, ['gerar' => 'Não foi possível gerar o PDF: '.$exc->getMessage()]);
         }
 
         if (! is_string($caminho) || ! is_file($caminho)) {
@@ -126,11 +140,32 @@ class RelatorioPdfContingenciaController extends Controller
             return $this->falha($request, ['gerar' => 'O PDF foi gerado, mas o arquivo não foi encontrado.']);
         }
 
-        $this->gravarProgresso($token, 4, 'PDF pronto para download.', 'done');
+        $emailStatus = RelatorioPdfContingencia::EMAIL_NAO_SOLICITADO;
+        $emailMensagem = 'PDF pronto para download.';
+        $progressoStatus = 'done';
+        $etapa = 4;
+
+        if ($enviar) {
+            try {
+                $contingencia->enviar($aluno, $periodo, $caminho, $logger);
+                $emailStatus = RelatorioPdfContingencia::EMAIL_ENVIADO;
+                $emailMensagem = 'E-mail enviado para '.$aluno->email.'. PDF pronto para download.';
+                $etapa = 5;
+            } catch (Throwable $exc) {
+                $emailStatus = RelatorioPdfContingencia::EMAIL_FALHOU;
+                $emailMensagem = $exc->getMessage();
+                $progressoStatus = 'email_error';
+                $etapa = 5;
+            }
+        }
+
+        $this->gravarProgresso($token, $etapa, $emailMensagem, $progressoStatus, $emailStatus);
         $nome = basename($caminho);
 
         return response()->download($caminho, $nome, [
             'Content-Type' => 'application/pdf',
+            RelatorioPdfContingencia::HEADER_EMAIL => $emailStatus,
+            RelatorioPdfContingencia::HEADER_EMAIL_MENSAGEM => rawurlencode($emailMensagem),
         ])->deleteFileAfterSend(true);
     }
 
@@ -167,15 +202,15 @@ class RelatorioPdfContingenciaController extends Controller
 
     private function chaveProgresso(string $token): string
     {
-        return 'pdf-contingencia-progress.' . $token;
+        return 'pdf-contingencia-progress.'.$token;
     }
 
     /**
-     * @return array{status: string, step: int, message: string}
+     * @return array{status: string, step: int, message: string, email: string}
      */
     private function lerProgresso(string $token): array
     {
-        $padrao = ['status' => 'idle', 'step' => 0, 'message' => 'Aguardando…'];
+        $padrao = ['status' => 'idle', 'step' => 0, 'message' => 'Aguardando…', 'email' => ''];
         if (! $this->tokenValido($token)) {
             return $padrao;
         }
@@ -184,7 +219,7 @@ class RelatorioPdfContingenciaController extends Controller
         return is_array($salvo) ? array_merge($padrao, $salvo) : $padrao;
     }
 
-    private function gravarProgresso(string $token, int $step, string $message, string $status): void
+    private function gravarProgresso(string $token, int $step, string $message, string $status, string $email = ''): void
     {
         if (! $this->tokenValido($token)) {
             return;
@@ -194,12 +229,16 @@ class RelatorioPdfContingenciaController extends Controller
             'status' => $status,
             'step' => max((int) ($atual['step'] ?? 0), $step),
             'message' => $message,
+            'email' => $email !== '' ? $email : (string) ($atual['email'] ?? ''),
         ], now()->addMinutes(30));
     }
 
     private function etapaDoLog(string $message): int
     {
         $m = mb_strtolower($message);
+        if (str_contains($m, 'e-mail') || str_contains($m, 'cco:')) {
+            return 5;
+        }
         if (str_contains($m, 'salvo') || str_contains($m, 'sucesso') || str_contains($m, 'pronto')) {
             return 4;
         }

@@ -121,6 +121,26 @@ Exemplo: `relatorio_consolidado_20260818_2230_Giovanna_1.pdf`
 
 O envio de e-mail anexa o PDF consolidado mais recente do aluno para o `--periodo` informado. Lead, inscrição e relatório vão **com CCO** para `MAIL_BCC_ADDRESS` (padrão: `nayara@missaonomeacao.com.br`). O deploy da GitHub Action **não substitui** o `.env` da Hostinger; se a variável não existir no servidor, o padrão do `config/mail.php` continua valendo. Depois do envio do relatório, **todos os PDFs da pasta são apagados**.
 
+## Contingência (admin)
+
+Em `/admin/relatorios-pdf-contingencia` a mentora gera o PDF de **um aluno** e **um período já liberado**. Há duas ações:
+
+- **Baixar PDF** — só o download, sem e-mail (comportamento anterior).
+- **Gerar e enviar e-mail** — gera o consolidado na Tutory, anexa no e-mail do aluno e envia com o mesmo CCO dos relatórios oficiais. O download continua disponível. A contingência **não grava** as faixas no dashboard (pode ser um período antigo).
+
+O reenvio manual segue mesmo se `recebe_email` estiver desmarcado. Não envia para a mentora (`Aluno::isTeacher()`) nem para cadastro com e-mail inválido.
+
+### Onde ver os erros
+
+1. Overlay da própria tela (passo a passo, mensagem de SMTP e aviso se o PDF saiu mas o e-mail não).
+2. Log dedicado: `storage/logs/pdf-contingencia.log` (no servidor: `server/storage/logs/pdf-contingencia.log`).
+3. Log geral: `storage/logs/laravel.log` (as falhas também são gravadas aqui).
+
+```bash
+tail -n 80 storage/logs/pdf-contingencia.log
+grep -n "contingência" storage/logs/laravel.log
+```
+
 Para renderizar um modelo isolado (debug, não usado no e-mail):
 
 ```bash
