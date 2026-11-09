@@ -82,6 +82,33 @@ class SincronizarAlunosTutoryTest extends TestCase
         ));
     }
 
+    public function test_email_do_cadastro_substitui_login_antigo_local(): void
+    {
+        $amanda = Aluno::create([
+            'tutory_id' => '377712',
+            'nome' => 'Amanda Carvalho Vieira',
+            'email' => 'uni.amandav01@gmail.com',
+            'recebe_email' => true,
+            'ativo' => true,
+        ]);
+        $giovanna = Aluno::create([
+            'tutory_id' => '7711',
+            'nome' => 'Giovanna',
+            'email' => 'psicologa.giovanna_99@gmail.com',
+            'recebe_email' => true,
+            'ativo' => true,
+        ]);
+        $sync = new SincronizarAlunosTutory(logger: static function (): void {});
+
+        $sync->sincronizarLista([
+            ['id' => '377712', 'nome' => 'Amanda Carvalho Vieira', 'email' => 'uni.amandav@gmail.com'],
+            ['id' => '7711', 'nome' => 'Giovanna', 'email' => 'psicologa.giovanna99@gmail.com'],
+        ]);
+
+        $this->assertSame('uni.amandav@gmail.com', $amanda->fresh()->email);
+        $this->assertSame('psicologa.giovanna99@gmail.com', $giovanna->fresh()->email);
+    }
+
     public function test_mesmo_nome_com_tutory_id_diferente_atualiza_o_cadastro(): void
     {
         $aluno = Aluno::create([
