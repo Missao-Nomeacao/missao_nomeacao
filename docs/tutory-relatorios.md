@@ -172,7 +172,7 @@ A Tutory sempre envia um cadastro chamado **Aluno teste**. O job ignora esse nom
 
 O nome no admin é único. Se a Tutory devolver o mesmo nome com **outro** `tutory_id` (cadastro recriado na Tutory), o sync **atualiza** o id local em vez de pular como duplicata. Quem está em `status=desativados` também é localizado por nome, mesmo com id antigo, e fica `ativo=false`.
 
-Nos alunos **ativos**, o sync abre Ações → Cadastro (`/alunos/index?aid={id}`) e grava `telefone` como `55` + DDD + número, só dígitos. O valor da Tutory prevalece sobre o que estiver no admin. Alunos desativados não têm o telefone consultado.
+Nos alunos **ativos**, o sync abre Ações → Cadastro (`/alunos/index?aid={id}`) e grava `email` e `telefone` a partir desse formulário. O e-mail do campo do cadastro prevalece sobre o texto do card da lista (o card pode ainda mostrar um login antigo, como `uni.amandav01@gmail.com` em vez de `uni.amandav@gmail.com`). O telefone vai como `55` + DDD + número, só dígitos. Os dois valores da Tutory prevalecem sobre o que estiver no admin. Alunos desativados não têm o cadastro consultado.
 
 Para inspecionar no servidor:
 

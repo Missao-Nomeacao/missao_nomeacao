@@ -9,7 +9,8 @@ use Throwable;
 /**
  * Espelha alunos ativos da Tutory na tabela local.
  *
- * Nome da Tutory prevalece. E-mail da Tutory prevalece se o aluno já existir.
+ * Nome da Tutory prevalece. E-mail do cadastro Tutory (Ações → Cadastro) prevalece
+ * se o aluno já existir — o texto do card da lista pode ser um login antigo.
  * O telefone dos ativos também prevalece, no padrão 55 + DDD + número.
  * recebe_email fica sempre true. O status local nasce true.
  * Só cadastra quem está ativo na Tutory e ainda não existe no portal.

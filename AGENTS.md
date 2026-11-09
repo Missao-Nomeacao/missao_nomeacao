@@ -86,7 +86,7 @@ Colunas de faixa do último período (não renomeie; o admin e o e-mail já leem
 - `last_subjects`
 - `prev_*` — período anterior, para a tendência do dashboard
 
-`recebe_email` é uma das condições do e-mail do PDF quinzenal; a regra completa está em Relatórios Tutory. `ativo` espelha o status na Tutory. `telefone` guarda o contato no padrão `55` + DDD + número, só dígitos (DDD `61` e telefone `9912-38860` viram `5561991238860`). O sync dos ativos abre Ações → Cadastro (`/alunos/index?aid={id}`) e grava o valor da Tutory por cima do local. Cadastro sem DDD ou sem número deixa o campo vazio. Falha ao abrir o cadastro não apaga o telefone já salvo. Alunos desativados não passam por essa etapa.
+`recebe_email` é uma das condições do e-mail do PDF quinzenal; a regra completa está em Relatórios Tutory. `ativo` espelha o status na Tutory. `telefone` guarda o contato no padrão `55` + DDD + número, só dígitos (DDD `61` e telefone `9912-38860` viram `5561991238860`). O sync dos ativos abre Ações → Cadastro (`/alunos/index?aid={id}`) e grava **e-mail e telefone** da Tutory por cima do local. O e-mail vem do campo do formulário, não do card da lista (o card pode ainda mostrar um login antigo). Cadastro sem DDD ou sem número deixa o telefone vazio. Falha ao abrir o cadastro não apaga o telefone já salvo nem troca o e-mail. Alunos desativados não passam por essa etapa.
 
 ### Desempenho
 

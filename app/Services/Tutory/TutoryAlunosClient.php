@@ -13,8 +13,9 @@ use RuntimeException;
 /**
  * Sessão HTTP no admin da Tutory para listar alunos.
  *
- * Nos ativos, cada card abre Ações → Cadastro (`/alunos/index?aid={id}`)
- * e o telefone volta no padrão 55 + DDD + número, só dígitos.
+ * Nos ativos, cada card abre Ações → Cadastro (`/alunos/index?aid={id}`).
+ * O e-mail e o telefone vêm desse formulário, não do texto do card da lista:
+ * o card pode ainda mostrar um login antigo. Telefone no padrão 55 + DDD + número, só dígitos.
  */
 class TutoryAlunosClient
 {
@@ -144,13 +145,13 @@ class TutoryAlunosClient
                     continue;
                 }
                 $vistos[$aluno['id']] = true;
-                if ($aluno['email'] === '') {
-                    $aluno['email'] = $this->buscarEmailNoCadastro($aluno['id']);
-                }
                 if ($status === 'ativos') {
-                    $aluno = $this->anexarTelefoneDoCadastro($aluno, $urlAtual);
+                    $aluno = $this->anexarDadosDoCadastro($aluno, $urlAtual);
                 } else {
                     unset($aluno['cadastro_href']);
+                    if ($aluno['email'] === '') {
+                        $aluno['email'] = $this->buscarEmailNoCadastro($aluno['id']);
+                    }
                 }
                 $alunos[] = $aluno;
             }
@@ -219,7 +220,7 @@ class TutoryAlunosClient
      * @param  array{id: string, nome: string, email: string, cadastro_href?: string}  $aluno
      * @return array{id: string, nome: string, email: string, telefone?: string|null}
      */
-    private function anexarTelefoneDoCadastro(array $aluno, string $urlAtual): array
+    private function anexarDadosDoCadastro(array $aluno, string $urlAtual): array
     {
         $href = trim((string) ($aluno['cadastro_href'] ?? ''));
         unset($aluno['cadastro_href']);
@@ -227,12 +228,23 @@ class TutoryAlunosClient
         $this->log('Abrindo cadastro do aluno '.$aluno['id'].' (Ações → Cadastro)...');
         $resp = $this->client()->get($url);
         if ($resp->status() >= 400) {
-            $this->log('Cadastro indisponível para o aluno '.$aluno['id'].' (HTTP '.$resp->status().'). Telefone local mantido.');
+            $this->log('Cadastro indisponível para o aluno '.$aluno['id'].' (HTTP '.$resp->status().'). Dados do card mantidos.');
 
             return $aluno;
         }
 
-        $lido = $this->extrairTelefoneDoCadastro($resp->body());
+        $html = $resp->body();
+        $emailCadastro = $this->extrairEmailDoCadastro($html);
+        if ($emailCadastro !== '') {
+            if ($aluno['email'] !== '' && $aluno['email'] !== $emailCadastro) {
+                $this->log('E-mail do card "'.$aluno['email'].'" substituído pelo cadastro "'.$emailCadastro.'" (Tutory id '.$aluno['id'].').');
+            } elseif ($aluno['email'] === '') {
+                $this->log('E-mail obtido no cadastro Tutory id='.$aluno['id']);
+            }
+            $aluno['email'] = $emailCadastro;
+        }
+
+        $lido = $this->extrairTelefoneDoCadastro($html);
         if (! $lido['encontrou']) {
             $this->log('Cadastro do aluno '.$aluno['id'].' sem DDD e telefone. Telefone local mantido.');
 
@@ -245,6 +257,51 @@ class TutoryAlunosClient
             : 'Cadastro da Tutory id='.$aluno['id'].' sem telefone.');
 
         return $aluno;
+    }
+
+    /**
+     * Campo do formulário Ações → Cadastro. Não usa o primeiro e-mail do HTML:
+     * a página pode ainda citar um login antigo no card ou em script.
+     */
+    public function extrairEmailDoCadastro(string $html): string
+    {
+        $xp = $this->loadDom($html);
+        $queries = [
+            '//*[@id="cadastroAlunoEmail" or @id="cadastroAlunoMail"]',
+            '//input[@name="email" or @type="email"]',
+            '//input[contains(translate(@name,"EMAIL","email"),"email")]',
+            '//textarea[@name="email" or contains(translate(@name,"EMAIL","email"),"email")]',
+        ];
+        foreach ($queries as $query) {
+            $nodes = $xp->query($query);
+            if ($nodes === false) {
+                continue;
+            }
+            foreach ($nodes as $node) {
+                if (! $node instanceof DOMElement) {
+                    continue;
+                }
+                $valor = $this->valorDeCampoEmail($node);
+                if ($valor !== '') {
+                    return $valor;
+                }
+            }
+        }
+
+        return '';
+    }
+
+    private function valorDeCampoEmail(DOMElement $node): string
+    {
+        $valor = trim($node->getAttribute('value'));
+        if ($valor === '') {
+            $valor = trim((string) $node->textContent);
+        }
+        if (! filter_var($valor, FILTER_VALIDATE_EMAIL)) {
+            return '';
+        }
+
+        return mb_strtolower($valor);
     }
 
     private function extrairHrefCadastro(DOMXPath $xp, DOMElement $card): string
@@ -472,7 +529,7 @@ class TutoryAlunosClient
             if ($resp->status() >= 400) {
                 continue;
             }
-            $email = $this->extrairEmailDoHtml($resp->body());
+            $email = $this->extrairEmailDoCadastro($resp->body());
             if ($email !== '') {
                 $this->log("E-mail obtido no cadastro Tutory id={$id}");
 
@@ -481,25 +538,6 @@ class TutoryAlunosClient
         }
 
         return '';
-    }
-
-    private function extrairEmailDoHtml(string $html): string
-    {
-        $xp = $this->loadDom($html);
-        $inputs = $xp->query('//input[@type="email" or contains(translate(@name,"EMAIL","email"),"email")]');
-        if ($inputs !== false) {
-            foreach ($inputs as $input) {
-                if (! $input instanceof DOMElement) {
-                    continue;
-                }
-                $valor = trim($input->getAttribute('value'));
-                if (filter_var($valor, FILTER_VALIDATE_EMAIL)) {
-                    return mb_strtolower($valor);
-                }
-            }
-        }
-
-        return $this->primeiroEmailNoTexto($html);
     }
 
     private function primeiroEmailNoTexto(string $texto): string
